@@ -1,0 +1,48 @@
+name: chat_app
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  internet_connection_checker: ^3.0.1
+  get: ^4.7.3
+  flutter_bloc: ^9.1.1
+  flutter_secure_storage: ^9.2.2
+  get_it: ^9.2.1
+  web_socket_channel: ^3.0.3
+  google_fonts: ^8.2.1
+  image_picker: ^1.2.3
+  pusher_channels_flutter: ^2.4.0
+  pusher_reverb_flutter: ^0.0.10
+  agora_rtc_engine: ^6.5.4
+  permission_handler: ^13.0.1
+  flutter_local_notifications: ^22.3.0
+  flutter_callkit_incoming: ^3.1.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-VariableFont.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-VariableFont.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-VariableFont.ttf
+
+dependency_overrides:
+  permission_handler_android: 12.1.0

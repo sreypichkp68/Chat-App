@@ -1,0 +1,397 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:developer';
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
+import 'package:chat_app/core/constants/api_entpoint.dart';
+import 'package:chat_app/feature/call/callsession/call_session.dart';
+import 'package:chat_app/feature/call/callsignalingsevice/call_invite_payload.dart';
+import 'package:chat_app/feature/call/domain/reposity/call_repository.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
+
+import 'call_event.dart';
+import 'call_state.dart';
+
+const _agoraAppId = String.fromEnvironment('AGORA_APP_ID');
+
+class CallBloc extends Bloc<CallEvent, CallState> {
+  CallBloc({
+    required this.currentUserId,
+    required this.currentUserName,
+    required CallSignalingService signaling,
+    required CallRepository callRepository,
+  }) : _callRepository = callRepository,
+       _signaling = signaling,
+       super(const CallIdle()) {
+    on<CallStartRequested>(_onStartRequested);
+    on<CallInviteReceived>(_onInviteReceived);
+    on<CallAccepted>(_onAccepted);
+    on<CallDeclined>(_onDeclined);
+    on<CallEndRequested>(_onEndRequested);
+    on<CallEndedRemotely>(_onEndedRemotely);
+    on<CallMuteToggled>(_onMuteToggled);
+    on<CallSpeakerToggled>(_onSpeakerToggled);
+    on<CallPeerConnected>(_onPeerConnected);
+    on<CallElapsedTicked>(_onElapsedTicked);
+
+    _signaling.start(currentUserId);
+    _inviteSub = _signaling.onIncomingInvite.listen((payload) {
+      add(
+        CallInviteReceived(
+          CallSession(
+            callId: payload.callId,
+            channelName: payload.channelName,
+            peerId: payload.callerId,
+            peerName: payload.callerName,
+            direction: CallDirection.incoming,
+            status: CallStatus.ringing,
+            isVideo: payload.isVideo,
+          ),
+        ),
+      );
+    });
+    _acceptedSub = _signaling.onAccepted.listen((callId) {
+      final s = state;
+      if (s is CallOutgoingRinging && s.session.callId == callId) {
+        add(const CallAccepted());
+      }
+    });
+    _declinedSub = _signaling.onDeclined.listen((callId) {
+      final s = state;
+      if (s is CallOutgoingRinging && s.session.callId == callId) {
+        add(const CallDeclined());
+      }
+    });
+    _endedSub = _signaling.onEnded.listen((callId) {
+      final s = state;
+      final activeId = s is CallConnected
+          ? s.session.callId
+          : s is CallOutgoingRinging
+          ? s.session.callId
+          : s is CallIncomingRinging
+          ? s.session.callId
+          : null;
+      if (activeId == callId) add(const CallEndedRemotely());
+    });
+  }
+
+  final String currentUserId;
+  final String currentUserName;
+  final CallSignalingService _signaling;
+  RtcEngine? get engine => _engine;
+  RtcEngine? _engine;
+  Timer? _elapsedTimer;
+  StreamSubscription? _inviteSub, _acceptedSub, _declinedSub, _endedSub;
+  final CallRepository _callRepository;
+
+  Future<void> _ensureEngine() async {
+    if (_engine != null) return;
+
+    final statuses = await [Permission.microphone, Permission.camera].request();
+
+    if (!statuses[Permission.microphone]!.isGranted) {
+      throw StateError('Microphone permission was not granted.');
+    }
+    if (!statuses[Permission.camera]!.isGranted) {
+      throw StateError('Camera permission was not granted.');
+    }
+
+    if (_agoraAppId.isEmpty) {
+      throw StateError(
+        'AGORA_APP_ID is empty. Run with --dart-define=AGORA_APP_ID=xxx '
+        '(see AGORA_SETUP.md).',
+      );
+    }
+    _engine = createAgoraRtcEngine();
+    await _engine!.initialize(RtcEngineContext(appId: _agoraAppId));
+    await _engine!.enableAudio();
+    await _engine!.enableVideo();
+    await _engine!.startPreview();
+    await _engine!.setChannelProfile(
+      ChannelProfileType.channelProfileCommunication,
+    );
+
+    _engine!.registerEventHandler(
+      RtcEngineEventHandler(
+        onJoinChannelSuccess: (connection, elapsed) {},
+        onUserJoined: (connection, remoteUid, elapsed) {
+          add(CallPeerConnected(remoteUid));
+        },
+        onUserOffline: (connection, remoteUid, reason) {
+          add(const CallEndedRemotely());
+        },
+        onError: (err, msg) {
+          // ignore: avoid_print
+          print('AGORA onError: $err  msg: $msg');
+          add(const CallEndedRemotely());
+        },
+      ),
+    );
+  }
+
+  Future<String> _fetchToken(String channelName, int uid) async {
+    final authToken = await _signaling.tokenStorage.getToken();
+    final uri = Uri.parse(
+      '${ApiEntpoint.callToken}?channelName=$channelName&uid=$uid',
+    );
+    final response = await http.get(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $authToken',
+        'Accept': 'application/json',
+      },
+    );
+    // ignore: avoid_print
+    print('TOKEN FETCH: ${response.statusCode} ${response.body}');
+    if (response.statusCode != 200) {
+      throw StateError('Could not fetch call token (${response.statusCode})');
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return decoded['token'] as String;
+  }
+
+  int _uidFor(String userId) => userId.hashCode & 0x7fffffff;
+
+  Future<void> _onStartRequested(
+    CallStartRequested event,
+    Emitter<CallState> emit,
+  ) async {
+    if (state is! CallIdle) return;
+    final callId = '${currentUserId}_${DateTime.now().microsecondsSinceEpoch}';
+    final channelName = 'call_$callId';
+    final session = CallSession(
+      callId: callId,
+      channelName: channelName,
+      peerId: event.peerId,
+      peerName: event.peerName,
+      direction: CallDirection.outgoing,
+      status: CallStatus.ringing,
+      isVideo: event.isVideo,
+    );
+    log(
+      'CALL STARTED: me=$currentUserId → peer=${event.peerId} '
+      '(${event.peerName}) callId=$callId',
+    );
+    emit(CallOutgoingRinging(session));
+
+    _signaling.sendInvite(
+      CallInvitePayload(
+        callId: callId,
+        callerId: currentUserId,
+        callerName: currentUserName,
+        calleeId: event.peerId,
+        channelName: channelName,
+        isVideo: event.isVideo,
+      ),
+    );
+
+    try {
+      await _ensureEngine();
+      final uid = _uidFor(currentUserId);
+      final token = await _fetchToken(channelName, uid);
+      await _engine!.joinChannel(
+        token: token,
+        channelId: channelName,
+        uid: uid,
+        options: const ChannelMediaOptions(
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          publishCameraTrack: true,
+          publishMicrophoneTrack: true,
+          autoSubscribeVideo: true,
+          autoSubscribeAudio: true,
+        ),
+      );
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('CALL START ERROR: $e\n$st');
+      emit(const CallFinished('Could not start call'));
+      await Future.delayed(const Duration(seconds: 2));
+      if (!isClosed) emit(const CallIdle());
+    }
+  }
+
+  void _onInviteReceived(CallInviteReceived event, Emitter<CallState> emit) {
+    if (state is! CallIdle) {
+      _signaling.sendDecline(event.session.callId, event.session.peerId);
+      return;
+    }
+    emit(CallIncomingRinging(event.session));
+  }
+
+  Future<void> _onAccepted(CallAccepted event, Emitter<CallState> emit) async {
+    final s = state;
+    if (s is CallIncomingRinging) {
+      _signaling.sendAccept(s.session.callId, s.session.peerId);
+      try {
+        await _ensureEngine();
+        final uid = _uidFor(currentUserId);
+        final token = await _fetchToken(s.session.channelName, uid);
+
+        emit(CallConnecting(s.session, uid));
+
+        await _engine!.joinChannel(
+          token: token,
+          channelId: s.session.channelName,
+          uid: uid,
+          options: const ChannelMediaOptions(
+            clientRoleType: ClientRoleType.clientRoleBroadcaster,
+            channelProfile: ChannelProfileType.channelProfileCommunication,
+            publishCameraTrack: true,
+            publishMicrophoneTrack: true,
+            autoSubscribeVideo: true,
+            autoSubscribeAudio: true,
+          ),
+        );
+      } catch (e, st) {
+        print('CALL ACCEPT ERROR: $e\n$st');
+        emit(const CallFinished('Could not connect'));
+        await Future.delayed(const Duration(seconds: 2));
+        if (!isClosed) emit(const CallIdle());
+      }
+    }
+  }
+
+  Future<void> _onDeclined(CallDeclined event, Emitter<CallState> emit) async {
+    final s = state;
+    if (s is CallIncomingRinging) {
+      _signaling.sendDecline(s.session.callId, s.session.peerId);
+      await _logCallEnd(s.session.callId, 'declined');
+    }
+    await _teardownEngine();
+    emit(const CallFinished('Declined'));
+    await Future.delayed(const Duration(seconds: 2));
+    if (!isClosed) emit(const CallIdle());
+  }
+
+  Future<void> _onEndRequested(
+    CallEndRequested event,
+    Emitter<CallState> emit,
+  ) async {
+    final s = state;
+    final session = s is CallConnected
+        ? s.session
+        : s is CallOutgoingRinging
+        ? s.session
+        : s is CallIncomingRinging
+        ? s.session
+        : null;
+    if (session != null) {
+      _signaling.sendEnd(session.callId, session.peerId);
+      await _logCallEnd(
+        session.callId,
+        s is CallConnected ? 'ended' : 'missed',
+      );
+    }
+    await _teardownEngine();
+    emit(const CallFinished('Call ended'));
+    await Future.delayed(const Duration(seconds: 2));
+    if (!isClosed) emit(const CallIdle());
+  }
+
+  Future<void> _onEndedRemotely(
+    CallEndedRemotely event,
+    Emitter<CallState> emit,
+  ) async {
+    if (state is CallIdle || state is CallFinished) return;
+    final s = state;
+    final session = s is CallConnected
+        ? s.session
+        : s is CallOutgoingRinging
+        ? s.session
+        : s is CallIncomingRinging
+        ? s.session
+        : null;
+    if (session != null) {
+      await _logCallEnd(
+        session.callId,
+        s is CallConnected ? 'ended' : 'missed',
+      );
+    }
+    await _teardownEngine();
+    emit(const CallFinished('Call ended'));
+    await Future.delayed(const Duration(seconds: 2));
+    if (!isClosed) emit(const CallIdle());
+  }
+
+  Future<void> _onMuteToggled(
+    CallMuteToggled event,
+    Emitter<CallState> emit,
+  ) async {
+    final s = state;
+    if (s is! CallConnected) return;
+    final next = !s.isMuted;
+    await _engine?.muteLocalAudioStream(next);
+    emit(s.copyWith(isMuted: next));
+  }
+
+  Future<void> _onSpeakerToggled(
+    CallSpeakerToggled event,
+    Emitter<CallState> emit,
+  ) async {
+    final s = state;
+    if (s is! CallConnected) return;
+    final next = !s.isSpeakerOn;
+    await _engine?.setEnableSpeakerphone(next);
+    emit(s.copyWith(isSpeakerOn: next));
+  }
+
+  void _onPeerConnected(CallPeerConnected event, Emitter<CallState> emit) {
+    final s = state;
+    final session = s is CallOutgoingRinging
+        ? s.session
+        : s is CallIncomingRinging
+        ? s.session
+        : s is CallConnecting
+        ? s.session
+        : null;
+    if (session == null) return;
+
+    emit(
+      CallConnected(
+        session,
+        remoteUid: event.remoteUid,
+        localUid: _uidFor(currentUserId),
+      ),
+    );
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!isClosed) add(const CallElapsedTicked());
+    });
+  }
+
+  void _onElapsedTicked(CallElapsedTicked event, Emitter<CallState> emit) {
+    final s = state;
+    if (s is CallConnected) {
+      emit(s.copyWith(elapsed: s.elapsed + const Duration(seconds: 1)));
+    }
+  }
+
+  Future<void> _teardownEngine() async {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    await _engine?.leaveChannel();
+    await _engine?.release();
+    _engine = null;
+  }
+
+  Future<void> _logCallEnd(String callId, String status) async {
+    try {
+      await _callRepository.endCall(callId: callId, status: status);
+    } catch (e) {
+      log('Failed to log call end: $e');
+    }
+  }
+
+  @override
+  Future<void> close() async {
+    await _inviteSub?.cancel();
+    await _acceptedSub?.cancel();
+    await _declinedSub?.cancel();
+    await _endedSub?.cancel();
+    await _teardownEngine();
+    await _signaling.dispose();
+    return super.close();
+  }
+}
