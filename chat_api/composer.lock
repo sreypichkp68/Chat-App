@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ea40a95691fe9f3b3309cf611fb55b82",
+    "content-hash": "614037df18839c8c4b2fae5eb5857ec9",
     "packages": [
         {
             "name": "boogiefromzk/agora-token",
@@ -9351,7 +9351,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.1"
+        "php": "^8.2"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"
