@@ -68,9 +68,7 @@ void initDependencies() {
     () => MessageDataSourceImpl(client: sl(), tokenStorage: sl()),
   );
 
-  // NOTE: CallBloc is NOT registered here — it needs a logged-in user,
-  // so it's registered on demand via registerCallBloc(), called from
-  // LoginBloc after a successful login or auto-login check.
+
 
   sl.registerLazySingleton<MessageSocketDataSource>(
     () => MessageSocketDataSourceImpl(tokenStorage: TokenStorage()),
@@ -102,7 +100,7 @@ void initDependencies() {
     () => FriendRequestRemoteDatasourceImpl(client: sl(), tokenStorage: sl()),
   );
   sl.registerLazySingleton(() => CallSignalingService(sl()));
-
+  
   sl.registerLazySingleton<CallRemoteDataSource>(
     () => CallRemotedataSource(sl<TokenStorage>()),
   );
@@ -114,40 +112,30 @@ void initDependencies() {
 /// Registers CallBloc once a user id is available (after login or
 /// on auto-login). Safe to call multiple times — no-ops if already
 /// registered.
+bool _registeringCallBloc = false;
+
 Future<void> registerCallBloc() async {
-  if (sl.isRegistered<CallBloc>()) return;
-
-  sl.registerSingletonAsync<CallBloc>(() async {
-    final tokenStorage = sl<TokenStorage>();
-    final userId = await tokenStorage.getUserId();
-    final userName = await tokenStorage.getUserName();
-
-    if (userId == null || userId.isEmpty) {
-      throw StateError('CallBloc needs a logged-in user id.');
-    }
-
-    final signaling = sl<CallSignalingService>();
-    await signaling.start(userId);
-
-    return CallBloc(
-      currentUserId: userId,
-      currentUserName: userName ?? '',
-      signaling: signaling,
-      callRepository: sl<CallRepository>(),
-    );
-  });
-  await sl.isReady<CallBloc>();
-  //Register Data Source / Repository
-  sl.registerLazySingleton<GroupRepository>(
-    () => GroupRepositoryImpl(
-      sl(),
-    ), // Adjust to match your repository constructor
-  );
-
-  //Register UseCase (This was missing!)
-  sl.registerLazySingleton(() => CreateGroupUsecase(sl<GroupRepository>()));
-
-  //Register BLoC
-  sl.registerFactory(() => GroupBloc(sl<CreateGroupUsecase>()));
-  sl.registerFactory(() => GroupBloc(sl<CreateGroupUsecase>()));
+  if (sl.isRegistered<CallBloc>() || _registeringCallBloc) return;
+  _registeringCallBloc = true;
+  try {
+    sl.registerSingletonAsync<CallBloc>(() async {
+      final tokenStorage = sl<TokenStorage>();
+      final userId = await tokenStorage.getUserId();
+      final userName = await tokenStorage.getUserName();
+      if (userId == null || userId.isEmpty) {
+        throw StateError('CallBloc needs a logged-in user id.');
+      }
+      final signaling = sl<CallSignalingService>();
+      await signaling.start(userId);
+      return CallBloc(
+        currentUserId: userId,
+        currentUserName: userName ?? '',
+        signaling: signaling,
+        callRepository: sl<CallRepository>(),
+      );
+    });
+    await sl.isReady<CallBloc>();
+  } finally {
+    _registeringCallBloc = false;
+  }
 }

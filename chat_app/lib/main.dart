@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/notification_service.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_bloc.dart';
@@ -7,13 +9,26 @@ import 'package:chat_app/feature/group/presentation/bloc/group_bloc.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.instance.initialize();
-  initDependencies();
-  runApp(const MyApp());
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      //when use server docker need it
+      await dotenv.load(fileName: ".env");
+      await NotificationService.instance.initialize();
+      initDependencies();
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      if (error.toString().contains('Cannot add event after closing')) {
+        return; // known race in pusher_reverb_flutter's auto-pong on disconnect
+      }
+      debugPrint('Uncaught error: $error\n$stack');
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {

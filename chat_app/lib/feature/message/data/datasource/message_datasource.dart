@@ -71,6 +71,30 @@ class ConversationSummary {
       previewText = '🎤 Voice message';
     } else if (lastMessageType == 'file') {
       previewText = '📎 File';
+    } else if (lastMessageType == 'call_log') {
+      Map<String, dynamic> meta = {};
+      final rawMeta = lastMessage['metadata'];
+      if (rawMeta is String) {
+        try {
+          meta = jsonDecode(rawMeta) as Map<String, dynamic>;
+        } catch (_) {}
+      } else if (rawMeta is Map) {
+        meta = Map<String, dynamic>.from(rawMeta);
+      }
+      final status = meta['status'] as String?;
+      final duration = meta['duration_seconds'] as int?;
+      if (status == 'missed') {
+        previewText = 'Missed call';
+      } else if (status == 'declined') {
+        previewText = 'Declined call';
+      } else if (status == 'no_answer') {
+        previewText = 'No answer';
+      } else if (duration != null && duration > 0) {
+        previewText =
+            'Call · ${duration ~/ 60}:${(duration % 60).toString().padLeft(2, '0')}';
+      } else {
+        previewText = 'Call';
+      }
     } else if (lastMessageContent != null && lastMessageContent.isNotEmpty) {
       previewText = lastMessageContent;
     } else {

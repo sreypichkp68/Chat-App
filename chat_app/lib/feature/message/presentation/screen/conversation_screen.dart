@@ -52,7 +52,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   void dispose() {
     _composer.dispose();
     _scrollController.dispose();
-    _callBloc.close();
+    
     super.dispose();
   }
 

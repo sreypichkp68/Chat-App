@@ -25,6 +25,7 @@ dependencies:
   permission_handler: ^13.0.1
   flutter_local_notifications: ^22.3.0
   flutter_callkit_incoming: ^3.1.5
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -33,6 +34,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env
   fonts:
     - family: Fraunces
       fonts:

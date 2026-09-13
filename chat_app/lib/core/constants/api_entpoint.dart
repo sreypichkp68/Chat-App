@@ -1,13 +1,13 @@
 class ApiEntpoint {
   //Real Device
   static const String host = '192.168.100.218';
-  static String get url => 'http://$host:8000/api';
+  static String get url => 'http://$host:8080/api';
 
   // Reverb
   static const reverbKey = '5khygsotvewpdgtiglgj';
   static String get reverbHost => host;
-  static const int reverbPort = 8080;
-
+  // static const int reverbPort = 8080;
+  static const int reverbPort = 6001;
   static String get callInvite => '$url/calls/invite';
   static String get callAccept => '$url/calls/accept';
   static String get callDecline => '$url/calls/decline';
@@ -22,6 +22,5 @@ class ApiEntpoint {
   static String get friendRequests => '$url/friend-requests';
   static String get friends => '$url/friends';
   static String get uploadMessageImage => '$url/messages/upload';
-  static String get broadcastingAuth => 'http://$host:8000/broadcasting/auth';
-
+  static String get broadcastingAuth => 'http://$host:8080/broadcasting/auth';
 }

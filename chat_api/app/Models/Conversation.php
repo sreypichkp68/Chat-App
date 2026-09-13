@@ -52,4 +52,16 @@ class Conversation extends Model
     {
         return $this->hasOne(Message::class)->latestOfMany();
     }
+    public function lastCall()
+{
+    $memberIds = $this->members()->pluck('user_id')->toArray();
+    if (count($memberIds) < 2) {
+        return null;
+    }
+
+    return \App\Models\Call::whereIn('caller_id', $memberIds)
+        ->whereIn('callee_id', $memberIds)
+        ->latest('started_at')
+        ->first();
+}
 }

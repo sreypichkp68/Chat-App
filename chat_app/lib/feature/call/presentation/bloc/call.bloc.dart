@@ -9,11 +9,11 @@ import 'package:chat_app/feature/call/domain/reposity/call_repository.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
-
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'call_event.dart';
 import 'call_state.dart';
 
-const _agoraAppId = String.fromEnvironment('AGORA_APP_ID');
+String get _agoraAppId => dotenv.env['AGORA_APP_ID'] ?? '';
 
 class CallBloc extends Bloc<CallEvent, CallState> {
   CallBloc({
@@ -34,7 +34,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     on<CallSpeakerToggled>(_onSpeakerToggled);
     on<CallPeerConnected>(_onPeerConnected);
     on<CallElapsedTicked>(_onElapsedTicked);
-
+    
     _signaling.start(currentUserId);
     _inviteSub = _signaling.onIncomingInvite.listen((payload) {
       add(
@@ -84,7 +84,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   Timer? _elapsedTimer;
   StreamSubscription? _inviteSub, _acceptedSub, _declinedSub, _endedSub;
   final CallRepository _callRepository;
-
+final Set<String> _loggedCallIds = {}; 
   Future<void> _ensureEngine() async {
     if (_engine != null) return;
 
@@ -116,15 +116,14 @@ class CallBloc extends Bloc<CallEvent, CallState> {
       RtcEngineEventHandler(
         onJoinChannelSuccess: (connection, elapsed) {},
         onUserJoined: (connection, remoteUid, elapsed) {
-          add(CallPeerConnected(remoteUid));
+          if (!isClosed) add(CallPeerConnected(remoteUid));
         },
         onUserOffline: (connection, remoteUid, reason) {
-          add(const CallEndedRemotely());
+          if (!isClosed) add(CallPeerConnected(remoteUid));
         },
         onError: (err, msg) {
-          // ignore: avoid_print
           print('AGORA onError: $err  msg: $msg');
-          add(const CallEndedRemotely());
+          if (!isClosed) add(const CallEndedRemotely());
         },
       ),
     );
@@ -255,6 +254,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
 
   Future<void> _onDeclined(CallDeclined event, Emitter<CallState> emit) async {
     final s = state;
+    
     if (s is CallIncomingRinging) {
       _signaling.sendDecline(s.session.callId, s.session.peerId);
       await _logCallEnd(s.session.callId, 'declined');
@@ -377,6 +377,8 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   }
 
   Future<void> _logCallEnd(String callId, String status) async {
+    if (_loggedCallIds.contains(callId)) return; // ← បន្ថែម: ការពារ log ស្ទួន
+    _loggedCallIds.add(callId);  
     try {
       await _callRepository.endCall(callId: callId, status: status);
     } catch (e) {

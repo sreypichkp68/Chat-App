@@ -75,12 +75,24 @@ class CallController extends Controller
     }
 
     public function end(Request $request, string $callId)
-    {
-        $data = $request->validate([
-            'status' => 'required|in:accepted,declined,ended,missed',
-        ]);
+{
+    $data = $request->validate([
+        'status' => 'required|in:accepted,declined,ended,missed',
+    ]);
 
-        $call = Call::where('call_id', $callId)->firstOrFail();
+    return \DB::transaction(function () use ($callId, $data) {
+        $call = Call::where('call_id', $callId)->lockForUpdate()->firstOrFail();
+
+        if ($call->ended_at !== null) {
+            $existingMessage = Conversation::betweenUsers($call->caller_id, $call->callee_id)
+                ?->messages()
+                ->where('message_type', 'call_log')
+                ->whereJsonContains('metadata->call_id', $call->call_id)
+                ->latest()
+                ->first();
+
+            return response()->json(['call' => $call, 'message' => $existingMessage]);
+        }
 
         $call->update([
             'status' => $data['status'],
@@ -111,7 +123,8 @@ class CallController extends Controller
         }
 
         return response()->json(['call' => $call, 'message' => $message]);
-    }
+    });
+}
 
     /**
      * Issues an Agora RTC token for the given channel/uid pair, so the

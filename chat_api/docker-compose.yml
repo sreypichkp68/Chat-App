@@ -65,6 +65,23 @@ services:
       - postgres
     networks:
       - laravel
+  reverb:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: laravel_reverb
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    command: php artisan reverb:start --host=0.0.0.0 --port=6001
+    ports:
+      - "6001:6001"
+    networks:
+      - laravel
+    depends_on:
+      - postgres
+      - redis
 
 networks:
   laravel:

@@ -23,7 +23,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   late Future<int> _friendRequestCount;
   late Future<List<ConversationSummary>> _conversations;
@@ -39,12 +39,20 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+     WidgetsBinding.instance.addObserver(this);
     _friendRequestCount = _loadFriendRequestCount();
     _conversations = _loadConversations();
     _conversationRefreshTimer = Timer.periodic(
       const Duration(seconds: 2),
       (_) => _refreshConversations(),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshConversations();
+    }
   }
 
   Future<int> _loadFriendRequestCount() async {
@@ -197,6 +205,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _conversationRefreshTimer?.cancel();
+     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
