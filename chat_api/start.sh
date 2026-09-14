@@ -2,7 +2,7 @@
 set -e
 
 # 1. Start Reverb (websocket server) on an internal-only port.
-php artisan reverb:start --host=0.0.0.0 --port=8080 &
+php artisan reverb:start --host=0.0.0.0 --port=6001 &
 
 # 2. Start the normal Laravel HTTP server on another internal-only port.
 php artisan serve --host=0.0.0.0 --port=8000 &
