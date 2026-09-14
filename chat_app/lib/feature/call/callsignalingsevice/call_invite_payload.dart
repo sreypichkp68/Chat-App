@@ -68,6 +68,7 @@ class CallSignalingService {
       host: ApiEntpoint.reverbHost,
       port: ApiEntpoint.reverbPort,
       appKey: ApiEntpoint.reverbKey,
+      authEndpoint: ApiEntpoint.broadcastingAuth, 
       useTLS:
           true, // FIX: Railway's port 443 is TLS-only; this was defaulting to false (ws://),
       // which caused "Connection closed before full header was received".
