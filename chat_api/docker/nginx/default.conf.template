@@ -3,6 +3,8 @@ server {
     server_name _;
 
     client_max_body_size 100M;
+    large_client_header_buffers 8 32k;
+    client_header_buffer_size 32k;
 
     location ~ ^/(app|apps)/ {
         proxy_pass http://127.0.0.1:8080;
