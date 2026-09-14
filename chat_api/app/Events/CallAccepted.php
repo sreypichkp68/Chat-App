@@ -1,5 +1,5 @@
 <?php
-// app/Events/CallAccepted.php
+
 namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
@@ -8,7 +8,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 
-class CallAccepted implements ShouldBroadcastNow
+class CallDeclined implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets;
 
@@ -21,7 +21,7 @@ class CallAccepted implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return 'CallAccepted';
+        return 'CallDeclined';
     }
 
     public function broadcastWith(): array

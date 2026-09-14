@@ -122,6 +122,11 @@ class CallController extends Controller
             broadcast(new MessageSent($message))->toOthers();
         }
 
+        // NEW: notify the other participant in real time that the call ended,
+        // so their screen closes immediately instead of waiting on a timeout.
+        $peerId = auth()->id() === $call->caller_id ? $call->callee_id : $call->caller_id;
+        broadcast(new \App\Events\CallEnded($call->call_id, (string) $peerId))->toOthers();
+
         return response()->json(['call' => $call, 'message' => $message]);
     });
 }

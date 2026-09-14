@@ -15,9 +15,9 @@ class CallInvited implements ShouldBroadcastNow
     public function __construct(public array $payload) {}
 
     public function broadcastOn(): Channel
-    {
-        return new Channel('test-calls-'.$this->payload['calleeId']);
-    }
+{
+    return new PrivateChannel('calls.'.$this->payload['calleeId']);
+}
 
     public function broadcastAs(): string
     {

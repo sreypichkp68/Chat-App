@@ -19,6 +19,6 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
         ->whereHas('members', fn ($query) => $query->where('user_id', $user->id))
         ->exists();
 });
-Broadcast::channel('calls.{id}', function ($user, $id) {
-    return (string) $user->id === (string) $id;
+Broadcast::channel('calls.{userId}', function ($user, $userId) {
+    return (int) $user->id === (int) $userId;
 });
