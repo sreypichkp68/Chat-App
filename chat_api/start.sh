@@ -11,9 +11,7 @@ php artisan serve --host=0.0.0.0 --port=8000 &
 #    nginx becomes the single process Railway's public domain actually
 #    talks to, and it routes requests to whichever internal process
 #    should handle them (Reverb vs artisan serve) based on the path.
-envsubst '${PORT}' < /etc/nginx/http.d/default.conf.template > /etc/nginx/http.d/default.conf
-
-# 4. Run nginx in the foreground so the container has a long-lived
+   envsubst '${PORT}' < /var/www/html/docker/nginx/default.conf.template > /etc/nginx/http.d/default.conf# 4. Run nginx in the foreground so the container has a long-lived
 #    process that Railway considers "alive". If nginx exits, the
 #    container stops — which is what we want if something goes wrong.
 nginx -g "daemon off;"
