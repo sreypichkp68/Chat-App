@@ -31,7 +31,7 @@ class CallInvitePayload {
       callerName: json['callerName']?.toString() ?? '',
       calleeId: json['calleeId'].toString(),
       channelName: json['channelName'].toString(),
-      isVideo: json['isVideo'] == true || json['isVideo']?.toString() == '1'
+      isVideo: json['isVideo'] == true || json['isVideo']?.toString() == '1',
     );
   }
 
@@ -42,7 +42,6 @@ class CallInvitePayload {
     'isVideo': isVideo,
     'calleeId': calleeId,
     'channelName': channelName,
-
   };
 }
 
@@ -69,6 +68,9 @@ class CallSignalingService {
       host: ApiEntpoint.reverbHost,
       port: ApiEntpoint.reverbPort,
       appKey: ApiEntpoint.reverbKey,
+      useTLS:
+          true, // FIX: Railway's port 443 is TLS-only; this was defaulting to false (ws://),
+      // which caused "Connection closed before full header was received".
       authorizer: (channelName, socketId) async {
         final token = await tokenStorage.getToken();
         final response = await http.post(
@@ -87,23 +89,25 @@ class CallSignalingService {
     _client = client;
     await client.connect();
     print('REVERB CONNECTED for user $currentUserId');
-    final channel = client.subscribeToChannel('test-calls-$currentUserId');
+
+    // FIX: was subscribeToChannel('test-calls-$currentUserId') — a public channel
+    // that neither matched the backend's PrivateChannel('calls.'.$id) broadcast,
+    // nor required auth. Now correctly subscribes to the private channel that
+    // Laravel's PrivateChannel('calls.'.$userId) produces on the wire
+    // (private- prefix is added automatically by Laravel/Echo convention).
+    final channel = client.subscribeToPrivateChannel(
+      'private-calls.$currentUserId',
+    );
     try {
       await channel.subscribe();
       print('SUBSCRIBED to private-calls.$currentUserId');
     } catch (e, st) {
       print('SUBSCRIBE ERROR: $e\n$st');
     }
-    print('SUBSCRIBED to private-calls.$currentUserId');
 
-    channel.on('App\\Events\\CallInvited').listen((event) {
-      print('FULL NAMESPACE EVENT RECEIVED: ${event.data}');
-      final data = event.data is String
-          ? jsonDecode(event.data as String) as Map<String, dynamic>
-          : event.data as Map<String, dynamic>;
-      _incomingInviteController.add(CallInvitePayload.fromJson(data));
-    });
-
+    // NOTE: removed the redundant 'App\\Events\\CallInvited' listener —
+    // broadcastAs() on the backend already aliases the event to 'CallInvited',
+    // so only one listener is needed.
     channel.on('CallInvited').listen((event) {
       print('CALL INVITED EVENT RECEIVED: ${event.data}');
       final data = event.data is String
@@ -163,16 +167,15 @@ class CallSignalingService {
     );
   }
 
-  Future<void> dispose()async {
+  Future<void> dispose() async {
     await runZonedGuarded(
       () {
-         _client?.disconnect();
+        _client?.disconnect();
       },
       (error, stack) {
         debugPrint('Ignored teardown error in ReverbClient.disconnect: $error');
       },
     );
-   // _client?.disconnect();
     _incomingInviteController.close();
     _acceptedController.close();
     _declinedController.close();

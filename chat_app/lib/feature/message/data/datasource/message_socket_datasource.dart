@@ -30,13 +30,16 @@ class MessageSocketDataSourceImpl implements MessageSocketDataSource {
     return _controller!.stream;
   }
 
- Future<void> _initClient() async {
+  Future<void> _initClient() async {
     try {
       // Await the ReverbClient.instance properly since it's asynchronous
       final client = await ReverbClient.instance(
         host: ApiEntpoint.reverbHost,
         port: ApiEntpoint.reverbPort,
         appKey: ApiEntpoint.reverbKey,
+        useTLS:
+            true, // FIX: Railway's port 443 is TLS-only; this was defaulting
+        // to false (ws://), causing "Connection closed before full header was received".
         authorizer: (channelName, socketId) async {
           final token = await tokenStorage.getToken();
           final response = await http.post(
@@ -47,7 +50,7 @@ class MessageSocketDataSourceImpl implements MessageSocketDataSource {
             },
             body: {'socket_id': socketId, 'channel_name': channelName},
           );
-            print(
+          print(
             'MESSAGE BROADCASTING AUTH: ${response.statusCode} ${response.body}',
           );
 
@@ -59,8 +62,12 @@ class MessageSocketDataSourceImpl implements MessageSocketDataSource {
       _client = client;
       await client.connect();
 
-      // Now 'client' is fully resolved, and privateChannel will work seamlessly
-      final channel = client.subscribeToChannel(_channelName!);
+      // FIX: was subscribeToChannel(_channelName!), the PUBLIC-channel method.
+      // Public channels never call the authorizer, so this subscription was
+      // effectively unauthenticated (and likely silently rejected by Reverb,
+      // since _channelName already carries the "private-" prefix). Using the
+      // matching private-channel method actually triggers the auth handshake.
+      final channel = client.subscribeToPrivateChannel(_channelName!);
       await channel.subscribe();
 
       channel.stream.listen((event) {
