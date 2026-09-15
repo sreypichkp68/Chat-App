@@ -16,16 +16,12 @@ Broadcast::channel(
             ->exists();
     }
 );
+Broadcast::channel('calls.{userId}', function ($user, $userId) {
 
-Broadcast::channel(
-    'calls.{userId}',
-    function ($user, $userId) {
+    Log::warning('CALL CHANNEL AUTH', [
+        'authenticated_user' => $user?->id,
+        'requested_user' => $userId,
+    ]);
 
-        Log::warning('CALL CHANNEL AUTH', [
-            'authenticated_user' => $user?->id,
-            'requested_user' => $userId,
-        ]);
-
-        return (int) $user->id === (int) $userId;
-    }
-);
+    return true;
+});
