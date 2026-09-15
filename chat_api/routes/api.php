@@ -1,5 +1,4 @@
 <?php
-namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\CallController;
 use App\Http\Controllers\Api\GroupController;
@@ -7,7 +6,10 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\FriendRequestController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\UserController;
+use GuzzleHttp\Psr7\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+use Laravel\Reverb\Loggers\Log;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -15,6 +17,17 @@ Route::post('/login', [AuthController::class, 'login'])->name('login');
 
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
+ // Broadcasting Auth
+    Route::post('/broadcasting/auth', function (Request $request) {
+
+        Log::warning('API BROADCAST AUTH', [
+            'user_id' => $request->user()?->id,
+            'channel_name' => $request->input('channel_name'),
+            'socket_id' => $request->input('socket_id'),
+        ]);
+
+        return Broadcast::auth($request);
+    });
     // call
     Route::post('/calls/invite', [CallController::class, 'invite']);
     Route::post('/calls/accept', [CallController::class, 'accept']);
