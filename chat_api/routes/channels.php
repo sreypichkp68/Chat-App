@@ -13,11 +13,5 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
 });
 
 Broadcast::channel('calls.{userId}', function ($user, $userId) {
-
-    Log::warning('CALL CHANNEL AUTH', [
-        'authenticated_user' => $user?->id,
-        'requested_user' => $userId,
-    ]);
-
-    return true; // TEMPORARY DEBUG
+    return (int) $user->id === (int) $userId;
 });
