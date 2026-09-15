@@ -8,7 +8,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 
-class CallDeclined implements ShouldBroadcastNow
+class CallAccepted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets;
 
@@ -21,7 +21,7 @@ class CallDeclined implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return 'CallDeclined';
+        return 'CallAccepted';
     }
 
     public function broadcastWith(): array

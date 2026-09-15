@@ -10,6 +10,8 @@ use App\Models\Call;
 use App\Models\Conversation;
 use BoogieFromZk\AgoraToken\RtcTokenBuilder2;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Laravel\Reverb\Loggers\Log;
 
 class CallController extends Controller
 {
@@ -33,9 +35,9 @@ class CallController extends Controller
         ]);
         try {
             broadcast(new CallInvited($data))->toOthers();
-            \Log::info('BROADCAST SUCCESS', $data);
+            Log::info('BROADCAST SUCCESS', $data);
         } catch (\Throwable $e) {
-            \Log::error('BROADCAST FAILED: '.$e->getMessage(), [
+            Log::error('BROADCAST FAILED: '.$e->getMessage(), [
                 'exception' => $e,
             ]);
         }
@@ -80,7 +82,7 @@ class CallController extends Controller
         'status' => 'required|in:accepted,declined,ended,missed',
     ]);
 
-    return \DB::transaction(function () use ($callId, $data) {
+    return DB::transaction(function () use ($callId, $data) {
         $call = Call::where('call_id', $callId)->lockForUpdate()->firstOrFail();
 
         if ($call->ended_at !== null) {

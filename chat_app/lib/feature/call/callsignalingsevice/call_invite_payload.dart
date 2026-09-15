@@ -3,10 +3,9 @@ import 'dart:convert';
 
 import 'package:chat_app/core/constants/api_entpoint.dart';
 import 'package:chat_app/core/service/token_storage.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:http/http.dart' as http;
 import 'package:pusher_reverb_flutter/pusher_reverb_flutter.dart';
-
 class CallInvitePayload {
   final String callId;
   final String callerId;
@@ -89,13 +88,16 @@ class CallSignalingService {
     );
     _client = client;
     await client.connect();
+
+    // Wait for the client's internal state to actually reach `connected`
+    // before subscribing — connect() can resolve slightly before this flag
+    // flips, causing "not connected to server" on an immediate subscribe.
+    await client.onConnectionStateChange.firstWhere(
+      (state) => state == ConnectionState.connected,
+    );
+
     print('REVERB CONNECTED for user $currentUserId');
 
-    // FIX: was subscribeToChannel('test-calls-$currentUserId') — a public channel
-    // that neither matched the backend's PrivateChannel('calls.'.$id) broadcast,
-    // nor required auth. Now correctly subscribes to the private channel that
-    // Laravel's PrivateChannel('calls.'.$userId) produces on the wire
-    // (private- prefix is added automatically by Laravel/Echo convention).
     final channel = client.subscribeToPrivateChannel(
       'private-calls.$currentUserId',
     );
