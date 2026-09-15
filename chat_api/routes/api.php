@@ -6,10 +6,10 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\FriendRequestController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\UserController;
-use GuzzleHttp\Psr7\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
-use Laravel\Reverb\Loggers\Log;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 // Public routes
 Route::post('/register', [AuthController::class, 'register']);
