@@ -2,6 +2,7 @@
 
 use App\Models\Conversation;
 use Illuminate\Support\Facades\Broadcast;
+use Laravel\Reverb\Loggers\Log;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,5 +21,11 @@ Broadcast::channel('conversation.{conversationId}', function ($user, $conversati
         ->exists();
 });
 Broadcast::channel('calls.{userId}', function ($user, $userId) {
+
+    Log::info('CALL CHANNEL AUTH', [
+        'authenticated_user' => $user->id,
+        'requested_user' => $userId,
+    ]);
+
     return (int) $user->id === (int) $userId;
 });
