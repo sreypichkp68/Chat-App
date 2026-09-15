@@ -2,30 +2,30 @@
 
 use App\Models\Conversation;
 use Illuminate\Support\Facades\Broadcast;
-use Laravel\Reverb\Loggers\Log;
+use Illuminate\Support\Facades\Log;
 
-/*
-|--------------------------------------------------------------------------
-| Broadcast Channels
-|--------------------------------------------------------------------------
-|
-| Here you may register all of the event broadcasting channels that your
-| application supports. The given channel authorization callbacks are
-| used to check if an authenticated user can listen to the channel.
-|
-*/
+Broadcast::channel(
+    'conversation.{conversationId}',
+    function ($user, $conversationId) {
+        return Conversation::where('id', $conversationId)
+            ->whereHas(
+                'members',
+                fn ($query) =>
+                    $query->where('user_id', $user->id)
+            )
+            ->exists();
+    }
+);
 
-Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
-    return Conversation::where('id', $conversationId)
-        ->whereHas('members', fn ($query) => $query->where('user_id', $user->id))
-        ->exists();
-});
-Broadcast::channel('calls.{userId}', function ($user, $userId) {
+Broadcast::channel(
+    'calls.{userId}',
+    function ($user, $userId) {
 
-    Log::info('CALL CHANNEL AUTH', [
-        'authenticated_user' => $user->id,
-        'requested_user' => $userId,
-    ]);
+        Log::warning('CALL CHANNEL AUTH', [
+            'authenticated_user' => $user?->id,
+            'requested_user' => $userId,
+        ]);
 
-    return (int) $user->id === (int) $userId;
-});
+        return (int) $user->id === (int) $userId;
+    }
+);
