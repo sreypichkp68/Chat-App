@@ -15,6 +15,7 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
   final _incomingCallTaps = StreamController<void>.broadcast();
   Stream<void> get incomingCallTaps => _incomingCallTaps.stream;
+  final Set<int> _messageIds = {};
 
   Future<void> initialize() async {
     const android = AndroidInitializationSettings('ic_call_notification');
@@ -83,5 +84,38 @@ class NotificationService {
 
   Future<void> cancelIncomingCall() async {
     await _plugin.cancel(id: 0);
+  }
+
+  Future<void> showMessage(int conversationId, String title, String body) async {
+    // Reserve 0 for incoming calls and 1001 for the foreground service.
+    final id = 2000 + (conversationId % 2147480000);
+    _messageIds.add(id);
+    await _plugin.show(
+      id: id,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
+        android: AndroidNotificationDetails(
+          'chat_messages',
+          'Chat messages',
+          channelDescription: 'Incoming text and photo messages',
+          importance: Importance.max,
+          priority: Priority.high,
+          category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.private,
+          autoCancel: true,
+          styleInformation: BigTextStyleInformation(body),
+        ),
+        iOS: const DarwinNotificationDetails(),
+      ),
+      payload: 'message:$conversationId',
+    );
+  }
+
+  Future<void> cancelMessages() async {
+    for (final id in _messageIds) {
+      await _plugin.cancel(id: id);
+    }
+    _messageIds.clear();
   }
 }

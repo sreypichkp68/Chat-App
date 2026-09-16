@@ -49,6 +49,7 @@ class CallSignalingService {
 
   final TokenStorage tokenStorage;
   ReverbClient? _client;
+  ReverbClient get client => _client!;
 
   final _incomingInviteController =
       StreamController<CallInvitePayload>.broadcast();

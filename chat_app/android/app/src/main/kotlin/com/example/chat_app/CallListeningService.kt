@@ -17,7 +17,7 @@ class CallListeningService : Service() {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(NotificationChannel(
-                CHANNEL, "Call availability", NotificationManager.IMPORTANCE_LOW
+                CHANNEL, "Chat availability", NotificationManager.IMPORTANCE_LOW
             ))
         }
         val openApp = PendingIntent.getActivity(this, 1,
@@ -31,8 +31,8 @@ class CallListeningService : Service() {
         }
         val notification = builder
             .setSmallIcon(R.drawable.ic_call_notification)
-            .setContentTitle("Waiting for calls")
-            .setContentText("Incoming calls are available while you use other apps.")
+            .setContentTitle("Listening for messages and calls")
+            .setContentText("Receive messages and calls while you use other apps.")
             .setContentIntent(openApp)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)

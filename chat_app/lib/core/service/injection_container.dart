@@ -1,4 +1,6 @@
 import 'package:chat_app/core/service/token_storage.dart';
+import 'package:chat_app/core/service/message_notification_listener.dart';
+import 'package:flutter/widgets.dart';
 import 'package:chat_app/core/service/background_call_service.dart';
 import 'package:chat_app/core/service/notification_service.dart';
 import 'package:chat_app/core/service/call_notification_listener.dart';
@@ -117,8 +119,12 @@ void initDependencies() {
 /// registered.
 bool _registeringCallBloc = false;
 CallNotificationListener? _callNotifications;
+MessageNotificationListener? _messageNotifications;
 
 Future<void> stopCallListening() async {
+  await _messageNotifications?.dispose();
+  _messageNotifications = null;
+  await NotificationService.instance.cancelMessages();
   await BackgroundCallService.stop();
   await _callNotifications?.dispose();
   _callNotifications = null;
@@ -156,8 +162,16 @@ Future<void> registerCallBloc() async {
       try {
         await BackgroundCallService.start();
         await signaling.start(userId);
+        _messageNotifications = MessageNotificationListener(
+          userId: userId,
+          show: NotificationService.instance.showMessage,
+          isBackground: () =>
+              WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed,
+        )..start(signaling.client);
         return bloc;
       } catch (_) {
+        await _messageNotifications?.dispose();
+        _messageNotifications = null;
         await _callNotifications?.dispose();
         _callNotifications = null;
         await bloc.close();
