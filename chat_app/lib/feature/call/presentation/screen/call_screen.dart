@@ -96,7 +96,7 @@ class CallScreen extends StatelessWidget {
                       const SizedBox(height: 56),
                       // Avatar នៅបង្ហាញតែពេលមិនទាន់ connected ប៉ុណ្ណោះ
                       // (ពេល connected video ជំនួសរួចហើយ)
-                      if (!isConnected) ...[
+                      if (state is! CallConnected || !state.session.isVideo) ...[
                         CircleAvatar(
                           radius: 48,
                           backgroundColor: const Color(0xFF34C471),

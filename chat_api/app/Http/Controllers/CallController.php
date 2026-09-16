@@ -33,6 +33,7 @@ class CallController extends Controller
             'callerName' => 'required|string',
             'calleeId' => 'required|integer',
             'channelName' => 'required|string',
+            'isVideo' => 'required|boolean',
         ]);
 
         Call::create([
@@ -40,6 +41,7 @@ class CallController extends Controller
             'caller_id' => $data['callerId'],
             'callee_id' => $data['calleeId'],
             'channel_name' => $data['channelName'],
+            'type' => $data['isVideo'] ? 'video' : 'audio',
             'status' => 'ringing',
             'started_at' => now(),
         ]);

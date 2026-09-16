@@ -14,6 +14,7 @@ class Call extends Model
         'caller_id',
         'callee_id',
         'channel_name',
+        'type',
         'status',
         'started_at',
         'ended_at',
