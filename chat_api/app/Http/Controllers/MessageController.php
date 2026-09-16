@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Message;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Reverb\Loggers\Log;
 
 class MessageController extends Controller
 {
@@ -93,19 +94,36 @@ class MessageController extends Controller
 
     // MessageController.php
     // MessageController.php
-    public function uploadImage(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|image|max:10240', // 10MB max
-        ]);
+   public function uploadImage(Request $request)
+{
+    $request->validate([
+        'file' => 'required|image|max:10240', // 10MB max
+    ]);
 
+    try {
         $uploadedFile = cloudinary()->upload(
             $request->file('file')->getRealPath(),
-            ['folder' => 'chat-app/messages']
+            [
+                'folder' => 'chat-app/messages',
+            ]
         );
 
         return response()->json([
-            'data' => ['url' => $uploadedFile->getSecurePath()],
+            'data' => [
+                'url' => $uploadedFile->getSecurePath(),
+            ],
         ]);
+    } catch (\Throwable $e) {
+        Log::error('CLOUDINARY UPLOAD ERROR', [
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ]);
+
+        return response()->json([
+            'message' => 'Cloudinary upload failed',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
 }
