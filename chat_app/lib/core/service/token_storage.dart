@@ -1,4 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:chat_app/core/service/background_call_service.dart';
 
 class TokenStorage {
   final FlutterSecureStorage _storage;
@@ -21,6 +22,7 @@ class TokenStorage {
 
   Future<void> deleteToken() async {
     await _storage.delete(key: _tokenKey);
+    await BackgroundCallService.stop();
   }
 
   Future<void> saveUserId(String userId) async {

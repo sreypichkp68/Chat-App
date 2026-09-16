@@ -15,6 +15,16 @@ use Laravel\Reverb\Loggers\Log;
 
 class CallController extends Controller
 {
+    public function show(Request $request, string $callId)
+    {
+        $call = Call::where('call_id', $callId)->firstOrFail();
+        abort_unless(in_array((int) $request->user()->id,
+            [(int) $call->caller_id, (int) $call->callee_id], true), 403);
+
+        return response()->json(['call_id' => $call->call_id,
+            'status' => $call->status, 'ended_at' => $call->ended_at]);
+    }
+
     public function invite(Request $request)
     {
         $data = $request->validate([
@@ -54,7 +64,9 @@ class CallController extends Controller
 
         Call::where('call_id', $data['callId'])->update(['status' => 'accepted']);
 
-        broadcast(new CallAccepted($data['callId'], (string) $data['peerId']))->toOthers();
+        // The event is addressed to the peer's private channel, so do not use
+        // toOthers(): it can suppress delivery when an X-Socket-ID is present.
+        broadcast(new CallAccepted($data['callId'], (string) $data['peerId']));
 
         return response()->json(['status' => 'ok']);
     }
@@ -71,7 +83,8 @@ class CallController extends Controller
             'ended_at' => now(),
         ]);
 
-        broadcast(new CallDeclined($data['callId'], (string) $data['peerId']))->toOthers();
+        // This is already sent only to the caller's private channel.
+        broadcast(new CallDeclined($data['callId'], (string) $data['peerId']));
 
         return response()->json(['status' => 'ok']);
     }
@@ -82,8 +95,22 @@ class CallController extends Controller
         'status' => 'required|in:accepted,declined,ended,missed',
     ]);
 
-    return DB::transaction(function () use ($callId, $data) {
+    return DB::transaction(function () use ($callId, $data, $request) {
         $call = Call::where('call_id', $callId)->lockForUpdate()->firstOrFail();
+
+        $currentUserId = (int) $request->user()->id;
+        $callerId = (int) $call->caller_id;
+        $calleeId = (int) $call->callee_id;
+        abort_unless(in_array($currentUserId, [$callerId, $calleeId], true), 403,
+            'You are not a participant in this call.');
+
+        $peerId = $currentUserId === $callerId ? $calleeId : $callerId;
+        // Publish after the final state is committed, including on retries.
+        // A retry must still dismiss the peer's ringing screen even when
+        // the history record was already written by an earlier request.
+        DB::afterCommit(function () use ($callId, $peerId) {
+            broadcast(new \App\Events\CallEnded($callId, (string) $peerId));
+        });
 
         if ($call->ended_at !== null) {
             $existingMessage = Conversation::betweenUsers($call->caller_id, $call->callee_id)
@@ -123,11 +150,6 @@ class CallController extends Controller
 
             broadcast(new MessageSent($message))->toOthers();
         }
-
-        // NEW: notify the other participant in real time that the call ended,
-        // so their screen closes immediately instead of waiting on a timeout.
-        $peerId = auth()->id() === $call->caller_id ? $call->callee_id : $call->caller_id;
-        broadcast(new \App\Events\CallEnded($call->call_id, (string) $peerId))->toOthers();
 
         return response()->json(['call' => $call, 'message' => $message]);
     });

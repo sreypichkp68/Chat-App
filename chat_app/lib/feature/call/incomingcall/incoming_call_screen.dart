@@ -14,13 +14,18 @@ class IncomingCallScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocConsumer<CallBloc, CallState>(
       listener: (context, state) {
-        if (state is CallConnected) {
+        final session = switch (state) {
+          CallConnecting(session: final session) => session,
+          CallConnected(session: final session) => session,
+          _ => null,
+        };
+        if (session != null) {
           final callBloc = context.read<CallBloc>();
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => BlocProvider.value(
                 value: callBloc,
-                child: CallScreen(initialPeerName: state.session.peerName),
+                child: CallScreen(initialPeerName: session.peerName),
               ),
             ),
           );
@@ -31,9 +36,12 @@ class IncomingCallScreen extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        final peerName = state is CallIncomingRinging
-            ? state.session.peerName
-            : 'Unknown';
+        final peerName = switch (state) {
+          CallIncomingRinging(session: final session) => session.peerName,
+          CallConnecting(session: final session) => session.peerName,
+          CallConnected(session: final session) => session.peerName,
+          _ => 'Unknown',
+        };
         return Scaffold(
           backgroundColor: const Color(0xFF14171B),
           body: SafeArea(

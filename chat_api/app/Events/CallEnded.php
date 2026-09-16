@@ -2,35 +2,32 @@
 
 namespace App\Events;
 
-use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
 
-class CallEnded
+class CallEnded implements ShouldBroadcastNow
 {
-    use Dispatchable, InteractsWithSockets, SerializesModels;
+    use Dispatchable, InteractsWithSockets;
 
-    /**
-     * Create a new event instance.
-     */
-    public function __construct()
+    public function __construct(
+        public string $callId,
+        public string $peerId,
+    ) {}
+
+    public function broadcastOn(): PrivateChannel
     {
-        //
+        return new PrivateChannel('calls.' . $this->peerId);
     }
 
-    /**
-     * Get the channels the event should broadcast on.
-     *
-     * @return array<int, \Illuminate\Broadcasting\Channel>
-     */
-    public function broadcastOn(): array
+    public function broadcastAs(): string
     {
-        return [
-            new PrivateChannel('channel-name'),
-        ];
+        return 'CallEnded';
+    }
+
+    public function broadcastWith(): array
+    {
+        return ['callId' => $this->callId];
     }
 }

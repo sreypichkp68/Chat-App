@@ -73,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     } finally {
+      await stopCallListening();
       await storage.deleteToken();
       await storage.deleteUserProfile();
       await storage.deleteUserId();

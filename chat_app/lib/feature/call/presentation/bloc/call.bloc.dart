@@ -34,8 +34,10 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     on<CallSpeakerToggled>(_onSpeakerToggled);
     on<CallPeerConnected>(_onPeerConnected);
     on<CallElapsedTicked>(_onElapsedTicked);
-    
-    _signaling.start(currentUserId);
+    _ringingStateSub = stream.listen(_watchIncomingCall);
+
+    // registerCallBloc starts signaling after these listeners are attached,
+    // so an invite arriving during connection setup is not lost.
     _inviteSub = _signaling.onIncomingInvite.listen((payload) {
       add(
         CallInviteReceived(
@@ -71,6 +73,8 @@ class CallBloc extends Bloc<CallEvent, CallState> {
           ? s.session.callId
           : s is CallIncomingRinging
           ? s.session.callId
+          : s is CallConnecting
+          ? s.session.callId
           : null;
       if (activeId == callId) add(const CallEndedRemotely());
     });
@@ -82,18 +86,53 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   RtcEngine? get engine => _engine;
   RtcEngine? _engine;
   Timer? _elapsedTimer;
+  Timer? _ringingPoll, _ringingTimeout;
+  StreamSubscription<CallState>? _ringingStateSub;
   StreamSubscription? _inviteSub, _acceptedSub, _declinedSub, _endedSub;
   final CallRepository _callRepository;
-final Set<String> _loggedCallIds = {}; 
-  Future<void> _ensureEngine() async {
+  final Set<String> _loggedCallIds = {};
+
+  void _watchIncomingCall(CallState next) {
+    _ringingPoll?.cancel();
+    _ringingTimeout?.cancel();
+    if (next is! CallIncomingRinging) return;
+    final callId = next.session.callId;
+    bool stillRinging() => !isClosed &&
+        state is CallIncomingRinging &&
+        (state as CallIncomingRinging).session.callId == callId;
+    var checking = false;
+    _ringingPoll = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (checking || !stillRinging()) return;
+      checking = true;
+      try {
+        if (await _signaling.hasCallEnded(callId) && stillRinging()) {
+          // The server already saved the final status; do not write it again.
+          _loggedCallIds.add(callId);
+          add(const CallEndedRemotely());
+        }
+      } catch (error) {
+        log('Call status check failed: $error');
+      } finally {
+        checking = false;
+      }
+    });
+    // Match the notification's expiry, including when connectivity is lost.
+    _ringingTimeout = Timer(const Duration(seconds: 60), () {
+      if (stillRinging()) add(const CallEndedRemotely());
+    });
+  }
+  Future<void> _ensureEngine({required bool isVideo}) async {
     if (_engine != null) return;
 
-    final statuses = await [Permission.microphone, Permission.camera].request();
+    final statuses = await [
+      Permission.microphone,
+      if (isVideo) Permission.camera,
+    ].request();
 
     if (!statuses[Permission.microphone]!.isGranted) {
       throw StateError('Microphone permission was not granted.');
     }
-    if (!statuses[Permission.camera]!.isGranted) {
+    if (isVideo && !statuses[Permission.camera]!.isGranted) {
       throw StateError('Camera permission was not granted.');
     }
 
@@ -106,8 +145,10 @@ final Set<String> _loggedCallIds = {};
     _engine = createAgoraRtcEngine();
     await _engine!.initialize(RtcEngineContext(appId: _agoraAppId));
     await _engine!.enableAudio();
-    await _engine!.enableVideo();
-    await _engine!.startPreview();
+    if (isVideo) {
+      await _engine!.enableVideo();
+      await _engine!.startPreview();
+    }
     await _engine!.setChannelProfile(
       ChannelProfileType.channelProfileCommunication,
     );
@@ -119,11 +160,18 @@ final Set<String> _loggedCallIds = {};
           if (!isClosed) add(CallPeerConnected(remoteUid));
         },
         onUserOffline: (connection, remoteUid, reason) {
-          if (!isClosed) add(CallPeerConnected(remoteUid));
+          final s = state;
+          if (!isClosed &&
+              s is CallConnected &&
+              s.remoteUid == remoteUid &&
+              s.session.channelName == connection.channelId) {
+            add(const CallEndedRemotely());
+          }
         },
         onError: (err, msg) {
           print('AGORA onError: $err  msg: $msg');
-          if (!isClosed) add(const CallEndedRemotely());
+          // SDK errors are not peer hang-ups. Some are recoverable; channel
+          // setup exceptions and the peer-offline callback handle termination.
         },
       ),
     );
@@ -186,26 +234,28 @@ final Set<String> _loggedCallIds = {};
     );
 
     try {
-      await _ensureEngine();
+      await _ensureEngine(isVideo: session.isVideo);
       final uid = _uidFor(currentUserId);
       final token = await _fetchToken(channelName, uid);
       await _engine!.joinChannel(
         token: token,
         channelId: channelName,
         uid: uid,
-        options: const ChannelMediaOptions(
+        options: ChannelMediaOptions(
           clientRoleType: ClientRoleType.clientRoleBroadcaster,
           channelProfile: ChannelProfileType.channelProfileCommunication,
-          publishCameraTrack: true,
+          publishCameraTrack: session.isVideo,
           publishMicrophoneTrack: true,
-          autoSubscribeVideo: true,
+          autoSubscribeVideo: session.isVideo,
           autoSubscribeAudio: true,
         ),
       );
     } catch (e, st) {
       // ignore: avoid_print
       print('CALL START ERROR: $e\n$st');
-      emit(const CallFinished('Could not start call'));
+      unawaited(_notifyRemoteCallEnded(callId, status: 'missed'));
+      emit(CallFinished('Could not start call: $e'));
+      await _teardownEngine();
       await Future.delayed(const Duration(seconds: 2));
       if (!isClosed) emit(const CallIdle());
     }
@@ -224,7 +274,7 @@ final Set<String> _loggedCallIds = {};
     if (s is CallIncomingRinging) {
       _signaling.sendAccept(s.session.callId, s.session.peerId);
       try {
-        await _ensureEngine();
+        await _ensureEngine(isVideo: s.session.isVideo);
         final uid = _uidFor(currentUserId);
         final token = await _fetchToken(s.session.channelName, uid);
 
@@ -234,18 +284,20 @@ final Set<String> _loggedCallIds = {};
           token: token,
           channelId: s.session.channelName,
           uid: uid,
-          options: const ChannelMediaOptions(
+          options: ChannelMediaOptions(
             clientRoleType: ClientRoleType.clientRoleBroadcaster,
             channelProfile: ChannelProfileType.channelProfileCommunication,
-            publishCameraTrack: true,
+            publishCameraTrack: s.session.isVideo,
             publishMicrophoneTrack: true,
-            autoSubscribeVideo: true,
+            autoSubscribeVideo: s.session.isVideo,
             autoSubscribeAudio: true,
           ),
         );
       } catch (e, st) {
         print('CALL ACCEPT ERROR: $e\n$st');
-        emit(const CallFinished('Could not connect'));
+        unawaited(_notifyRemoteCallEnded(s.session.callId, status: 'missed'));
+        emit(CallFinished('Could not connect: $e'));
+        await _teardownEngine();
         await Future.delayed(const Duration(seconds: 2));
         if (!isClosed) emit(const CallIdle());
       }
@@ -254,7 +306,7 @@ final Set<String> _loggedCallIds = {};
 
   Future<void> _onDeclined(CallDeclined event, Emitter<CallState> emit) async {
     final s = state;
-    
+
     if (s is CallIncomingRinging) {
       _signaling.sendDecline(s.session.callId, s.session.peerId);
       await _logCallEnd(s.session.callId, 'declined');
@@ -269,6 +321,7 @@ final Set<String> _loggedCallIds = {};
     CallEndRequested event,
     Emitter<CallState> emit,
   ) async {
+    if (state is CallIdle || state is CallFinished) return;
     final s = state;
     final session = s is CallConnected
         ? s.session
@@ -276,16 +329,22 @@ final Set<String> _loggedCallIds = {};
         ? s.session
         : s is CallIncomingRinging
         ? s.session
+        : s is CallConnecting
+        ? s.session
         : null;
     if (session != null) {
-      _signaling.sendEnd(session.callId, session.peerId);
-      await _logCallEnd(
-        session.callId,
-        s is CallConnected ? 'ended' : 'missed',
+      // Never wait for the API request before closing this device's call.
+      // A slow/unavailable server previously left the UI and Agora session
+      // active until the HTTP socket timed out.
+      unawaited(
+        _notifyRemoteCallEnded(
+          session.callId,
+          status: s is CallConnected ? 'ended' : 'missed',
+        ),
       );
     }
-    await _teardownEngine();
     emit(const CallFinished('Call ended'));
+    await _teardownEngine();
     await Future.delayed(const Duration(seconds: 2));
     if (!isClosed) emit(const CallIdle());
   }
@@ -302,15 +361,16 @@ final Set<String> _loggedCallIds = {};
         ? s.session
         : s is CallIncomingRinging
         ? s.session
+        : s is CallConnecting
+        ? s.session
         : null;
     if (session != null) {
-      await _logCallEnd(
-        session.callId,
-        s is CallConnected ? 'ended' : 'missed',
+      unawaited(
+        _logCallEnd(session.callId, s is CallConnected ? 'ended' : 'missed'),
       );
     }
-    await _teardownEngine();
     emit(const CallFinished('Call ended'));
+    await _teardownEngine();
     await Future.delayed(const Duration(seconds: 2));
     if (!isClosed) emit(const CallIdle());
   }
@@ -376,9 +436,23 @@ final Set<String> _loggedCallIds = {};
     _engine = null;
   }
 
+  Future<void> _notifyRemoteCallEnded(
+    String callId, {
+    required String status,
+  }) async {
+    try {
+      await _signaling.sendEnd(callId, status: status);
+      log('CALL END NOTIFIED: callId=$callId');
+    } catch (error, stackTrace) {
+      // The local call has already closed. Keep this failure visible without
+      // allowing it to prevent the terminal CallFinished state.
+      log('CALL END NOTIFICATION FAILED: $error', stackTrace: stackTrace);
+    }
+  }
+
   Future<void> _logCallEnd(String callId, String status) async {
     if (_loggedCallIds.contains(callId)) return; // ← បន្ថែម: ការពារ log ស្ទួន
-    _loggedCallIds.add(callId);  
+    _loggedCallIds.add(callId);
     try {
       await _callRepository.endCall(callId: callId, status: status);
     } catch (e) {
@@ -388,6 +462,9 @@ final Set<String> _loggedCallIds = {};
 
   @override
   Future<void> close() async {
+    await _ringingStateSub?.cancel();
+    _ringingPoll?.cancel();
+    _ringingTimeout?.cancel();
     await _inviteSub?.cancel();
     await _acceptedSub?.cancel();
     await _declinedSub?.cancel();

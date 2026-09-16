@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/calls/decline', [CallController::class, 'decline']);
     Route::post('/calls/{callId}/end', [CallController::class, 'end']);
     Route::get('/calls/token', [CallController::class, 'token']);
+    Route::get('/calls/{callId}', [CallController::class, 'show']);
     // Image
     Route::post('/messages/upload', [MessageController::class, 'uploadImage']);
     // Authentication

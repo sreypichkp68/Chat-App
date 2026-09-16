@@ -21,6 +21,11 @@ class CallScreen extends StatelessWidget {
       canPop: false,
       child: BlocConsumer<CallBloc, CallState>(
         listener: (context, state) {
+          if (state is CallFinished && state.reason.startsWith('Could not')) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.reason)));
+          }
           if (state is CallFinished || state is CallIdle) {
             if (Navigator.of(context, rootNavigator: true).canPop()) {
               Navigator.of(context, rootNavigator: true).pop();
@@ -31,11 +36,14 @@ class CallScreen extends StatelessWidget {
           final isConnected = state is CallConnected;
           final peerName = state is CallOutgoingRinging
               ? state.session.peerName
+              : state is CallConnecting
+              ? state.session.peerName
               : state is CallConnected
               ? state.session.peerName
               : initialPeerName;
           final statusLabel = switch (state) {
             CallOutgoingRinging() => 'Calling…',
+            CallConnecting() => 'Connecting...',
             CallConnected(elapsed: final e) => _formatElapsed(e),
             CallFinished(reason: final r) => r,
             _ => '',
@@ -53,7 +61,7 @@ class CallScreen extends StatelessWidget {
             backgroundColor: const Color(0xFF14171B),
             body: Stack(
               children: [
-                if (state is CallConnected) ...[
+                if (state is CallConnected && state.session.isVideo) ...[
                   Positioned.fill(
                     child: AgoraVideoView(
                       controller: VideoViewController.remote(

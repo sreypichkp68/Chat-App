@@ -1,4 +1,7 @@
 import 'package:chat_app/core/service/token_storage.dart';
+import 'package:chat_app/core/service/background_call_service.dart';
+import 'package:chat_app/core/service/notification_service.dart';
+import 'package:chat_app/core/service/call_notification_listener.dart';
 import 'package:chat_app/feature/auth/data/datasource/login_data_source.dart';
 import 'package:chat_app/feature/auth/data/datasource/register_data_source.dart';
 import 'package:chat_app/feature/auth/data/reposityImpl/login_repo_impl.dart';
@@ -113,6 +116,19 @@ void initDependencies() {
 /// on auto-login). Safe to call multiple times — no-ops if already
 /// registered.
 bool _registeringCallBloc = false;
+CallNotificationListener? _callNotifications;
+
+Future<void> stopCallListening() async {
+  await BackgroundCallService.stop();
+  await _callNotifications?.dispose();
+  _callNotifications = null;
+  await NotificationService.instance.cancelIncomingCall();
+  if (sl.isRegistered<CallBloc>() && sl.isReadySync<CallBloc>()) {
+    await sl<CallBloc>().close();
+    await sl.unregister<CallBloc>();
+    await sl.resetLazySingleton<CallSignalingService>();
+  }
+}
 
 Future<void> registerCallBloc() async {
   if (sl.isRegistered<CallBloc>() || _registeringCallBloc) return;
@@ -126,13 +142,28 @@ Future<void> registerCallBloc() async {
         throw StateError('CallBloc needs a logged-in user id.');
       }
       final signaling = sl<CallSignalingService>();
-      await signaling.start(userId);
-      return CallBloc(
+      final bloc = CallBloc(
         currentUserId: userId,
         currentUserName: userName ?? '',
         signaling: signaling,
         callRepository: sl<CallRepository>(),
       );
+      _callNotifications = CallNotificationListener(
+        states: bloc.stream,
+        show: NotificationService.instance.showIncomingCall,
+        cancel: NotificationService.instance.cancelIncomingCall,
+      );
+      try {
+        await BackgroundCallService.start();
+        await signaling.start(userId);
+        return bloc;
+      } catch (_) {
+        await _callNotifications?.dispose();
+        _callNotifications = null;
+        await bloc.close();
+        await BackgroundCallService.stop();
+        rethrow;
+      }
     });
     await sl.isReady<CallBloc>();
   } finally {

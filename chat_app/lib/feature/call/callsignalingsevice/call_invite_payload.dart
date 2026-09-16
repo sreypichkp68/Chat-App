@@ -63,75 +63,157 @@ class CallSignalingService {
   Stream<String> get onEnded => _endedController.stream;
 
   Future<void> start(String currentUserId) async {
-    final client = await ReverbClient.instance(
-      host: ApiEntpoint.reverbHost,
-      port: ApiEntpoint.reverbPort,
-      appKey: ApiEntpoint.reverbKey,
-      authEndpoint: ApiEntpoint.broadcastingAuth, 
-      useTLS:
-          true, // FIX: Railway's port 443 is TLS-only; this was defaulting to false (ws://),
-      // which caused "Connection closed before full header was received".
-      authorizer: (channelName, socketId) async {
-        final token = await tokenStorage.getToken();
-        final response = await http.post(
-          Uri.parse(ApiEntpoint.broadcastingAuth),
-          headers: {
+    try {
+      final client = await ReverbClient.instance(
+        host: ApiEntpoint.reverbHost,
+        port: ApiEntpoint.reverbPort,
+        appKey: ApiEntpoint.reverbKey,
+        authEndpoint: ApiEntpoint.broadcastingAuth,
+        useTLS: true,
+        pingInterval: const Duration(seconds: 15),
+
+        authorizer: (channelName, socketId) async {
+          final token = await tokenStorage.getToken();
+
+          if (token == null || token.isEmpty) {
+            throw Exception('Bearer token not found');
+          }
+
+          print(
+            'CALL AUTHORIZER: '
+            'channel=$channelName '
+            'socket=$socketId',
+          );
+
+          return {
             'Authorization': 'Bearer $token',
             'Accept': 'application/json',
-          },
-          body: {'socket_id': socketId, 'channel_name': channelName},
+          };
+        },
+
+        onConnected: (socketId) {
+          print('CALL REVERB CONNECTED: $socketId');
+        },
+        onDisconnected: () => debugPrint('CALL REVERB DISCONNECTED'),
+        onReconnecting: () => debugPrint('CALL REVERB RECONNECTING'),
+
+        onError: (error) {
+          print('CALL REVERB ERROR: $error');
+        },
+      );
+
+      _client = client;
+
+      await client.connect();
+
+      await client.onConnectionStateChange.firstWhere(
+        (state) => state == ConnectionState.connected,
+      );
+
+      print('REVERB CONNECTED for user $currentUserId');
+
+      final channelName = 'private-calls.$currentUserId';
+
+      print('SUBSCRIBING TO: $channelName');
+
+      final channel = client.subscribeToPrivateChannel(channelName);
+
+      // subscribeToPrivateChannel() starts the package's asynchronous auth and
+      // subscription flow itself. A second `channel.subscribe()` returns as
+      // soon as the channel is already "subscribing", so it cannot be used as
+      // proof that Reverb accepted the subscription.
+      channel.addStateListener((state) {
+        if (state == ChannelState.subscribed) {
+          print('✅ SUBSCRIBED TO: $channelName');
+        } else if (state == ChannelState.unsubscribed) {
+          print('❌ CALL CHANNEL UNSUBSCRIBED: $channelName');
+        }
+      });
+
+      // Debug ALL received events
+      channel.stream.listen(
+        (event) {
+          print(
+            '🔥 CALL CHANNEL EVENT: '
+            '${event.eventName}',
+          );
+
+          print(
+            '🔥 CALL CHANNEL DATA: '
+            '${event.data}',
+          );
+        },
+        onError: (error) {
+          print(
+            '❌ CALL CHANNEL STREAM ERROR: '
+            '$error',
+          );
+        },
+      );
+
+      channel.on('CallInvited').listen((event) {
+        print(
+          '📞 CALL INVITED RECEIVED: '
+          '${event.data}',
         );
-        print('BROADCASTING AUTH: ${response.statusCode} ${response.body}');
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-        return decoded.map((key, value) => MapEntry(key, value.toString()));
-      },
-    );
-    _client = client;
-    await client.connect();
 
-    // Wait for the client's internal state to actually reach `connected`
-    // before subscribing — connect() can resolve slightly before this flag
-    // flips, causing "not connected to server" on an immediate subscribe.
-    await client.onConnectionStateChange.firstWhere(
-      (state) => state == ConnectionState.connected,
-    );
+        try {
+          final data = event.data is String
+              ? jsonDecode(event.data as String) as Map<String, dynamic>
+              : Map<String, dynamic>.from(event.data as Map);
 
-    print('REVERB CONNECTED for user $currentUserId');
+          final payload = CallInvitePayload.fromJson(data);
 
-    final channel = client.subscribeToPrivateChannel(
-      'private-calls.$currentUserId',
-    );
-    try {
-      await channel.subscribe();
-      print('SUBSCRIBED to private-calls.$currentUserId');
+          print(
+            '📞 Incoming call '
+            'from ${payload.callerName}',
+          );
+
+          _incomingInviteController.add(payload);
+        } catch (e, st) {
+          print(
+            '❌ CallInvited parse error: '
+            '$e\n$st',
+          );
+        }
+      });
+
+      // You were missing this listener
+      channel.on('CallAccepted').listen((event) {
+        print('✅ CALL ACCEPTED: ${event.data}');
+
+        final data = event.data is String
+            ? jsonDecode(event.data as String) as Map<String, dynamic>
+            : Map<String, dynamic>.from(event.data as Map);
+
+        _acceptedController.add(data['callId'].toString());
+      });
+
+      channel.on('CallDeclined').listen((event) {
+        print('❌ CALL DECLINED: ${event.data}');
+
+        final data = event.data is String
+            ? jsonDecode(event.data as String) as Map<String, dynamic>
+            : Map<String, dynamic>.from(event.data as Map);
+
+        _declinedController.add(data['callId'].toString());
+      });
+
+      channel.on('CallEnded').listen((event) {
+        print('☎️ CALL ENDED: ${event.data}');
+
+        final data = event.data is String
+            ? jsonDecode(event.data as String) as Map<String, dynamic>
+            : Map<String, dynamic>.from(event.data as Map);
+
+        _endedController.add(data['callId'].toString());
+      });
     } catch (e, st) {
-      print('SUBSCRIBE ERROR: $e\n$st');
+      print(
+        '❌ CALL SIGNALING START ERROR: '
+        '$e\n$st',
+      );
     }
-
-    // NOTE: removed the redundant 'App\\Events\\CallInvited' listener —
-    // broadcastAs() on the backend already aliases the event to 'CallInvited',
-    // so only one listener is needed.
-    channel.on('CallInvited').listen((event) {
-      print('CALL INVITED EVENT RECEIVED: ${event.data}');
-      final data = event.data is String
-          ? jsonDecode(event.data as String) as Map<String, dynamic>
-          : event.data as Map<String, dynamic>;
-      _incomingInviteController.add(CallInvitePayload.fromJson(data));
-    });
-
-    channel.on('CallDeclined').listen((event) {
-      final data = event.data is String
-          ? jsonDecode(event.data as String) as Map<String, dynamic>
-          : event.data as Map<String, dynamic>;
-      _declinedController.add(data['callId'].toString());
-    });
-
-    channel.on('CallEnded').listen((event) {
-      final data = event.data is String
-          ? jsonDecode(event.data as String) as Map<String, dynamic>
-          : event.data as Map<String, dynamic>;
-      _endedController.add(data['callId'].toString());
-    });
   }
 
   Future<void> sendInvite(CallInvitePayload payload) async {
@@ -155,12 +237,27 @@ class CallSignalingService {
       _post(ApiEntpoint.callAccept, {'callId': callId, 'peerId': peerId});
   Future<void> sendDecline(String callId, String peerId) =>
       _post(ApiEntpoint.callDecline, {'callId': callId, 'peerId': peerId});
-  Future<void> sendEnd(String callId, String peerId) =>
-      _post(ApiEntpoint.callEnd, {'callId': callId, 'peerId': peerId});
+  Future<void> sendEnd(String callId, {required String status}) =>
+      _post(ApiEntpoint.callEnd(callId), {'status': status});
+
+  Future<bool> hasCallEnded(String callId) async {
+    final token = await tokenStorage.getToken();
+    final response = await http.get(
+      Uri.parse('${ApiEntpoint.url}/calls/${Uri.encodeComponent(callId)}'),
+      headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
+    ).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) {
+      throw StateError('Call status check failed (${response.statusCode})');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['call_id'] == callId &&
+        (data['ended_at'] != null ||
+            const ['ended', 'declined', 'missed'].contains(data['status']));
+  }
 
   Future<void> _post(String url, Map<String, dynamic> body) async {
     final token = await tokenStorage.getToken();
-    await http.post(
+    final response = await http.post(
       Uri.parse(url),
       headers: {
         'Authorization': 'Bearer $token',
@@ -168,6 +265,13 @@ class CallSignalingService {
       },
       body: jsonEncode(body),
     );
+
+    debugPrint('CALL API: ${response.statusCode} $url ${response.body}');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(
+        'Call API failed (${response.statusCode}): ${response.body}',
+      );
+    }
   }
 
   Future<void> dispose() async {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user.state.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_bloc.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_event.dart';
@@ -7,7 +8,6 @@ import 'package:chat_app/feature/searchusers/presentation/widget/user_search_til
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/friends/data/datasource/friend_request_remote_datasource.dart';
-import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
 import 'package:chat_app/feature/friends/presentation/screen/friend_requests_screen.dart';
 import 'package:chat_app/feature/message/domain/usecase/open_direct_conversation_usecase.dart';
 import 'package:chat_app/feature/message/presentation/screen/conversation_screen.dart';

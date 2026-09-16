@@ -2,7 +2,7 @@ import 'package:chat_app/feature/auth/presentation/bloc/login_bloc.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_event.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_state.dart';
 import 'package:chat_app/feature/auth/presentation/screen/register_screen.dart';
-import 'package:chat_app/main_screen.dart';
+import 'package:chat_app/feature/auth/presentation/screen/auth_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/app_validate.dart';
@@ -58,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
             );
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => const MainScreen()),
+              MaterialPageRoute(builder: (context) => const AuthGate()),
               (route) => false,
             );
           } else if (state is LoginError) {
