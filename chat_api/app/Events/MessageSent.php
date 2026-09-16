@@ -24,17 +24,9 @@ class MessageSent implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        $channels = [
+        return [
             new PrivateChannel('conversation.' . $this->message->conversation_id),
         ];
-        // The inbox remains subscribed even when no conversation is open.
-        $recipients = $this->message->conversation->members()
-            ->where('user_id', '!=', $this->message->sender_id)
-            ->pluck('user_id');
-        foreach ($recipients as $userId) {
-            $channels[] = new PrivateChannel('inbox.' . $userId);
-        }
-        return $channels;
     }
 
     public function broadcastAs(): string
