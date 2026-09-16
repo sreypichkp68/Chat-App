@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\MessageSent;
 use App\Models\Message;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -52,6 +53,8 @@ class MessageController extends Controller
             'metadata' => ! empty($metadata) ? $metadata : null,
             'reply_to_message_id' => $request->reply_to_message_id,
         ]);
+
+        broadcast(new MessageSent($message))->toOthers();
 
         return response()->json($message->load('sender:id,name,avatar_url'), 201);
     }

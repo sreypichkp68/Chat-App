@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Models\Message;
+use App\Models\ConversationMember;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
@@ -24,9 +25,19 @@ class MessageSent implements ShouldBroadcast
 
     public function broadcastOn(): array
     {
-        return [
+        $channels = [
             new PrivateChannel('conversation.' . $this->message->conversation_id),
         ];
+
+        $recipientIds = ConversationMember::where('conversation_id', $this->message->conversation_id)
+            ->where('user_id', '!=', $this->message->sender_id)
+            ->pluck('user_id');
+
+        foreach ($recipientIds as $userId) {
+            $channels[] = new PrivateChannel('inbox.' . $userId);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string
