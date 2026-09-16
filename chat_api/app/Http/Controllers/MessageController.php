@@ -12,7 +12,8 @@ class MessageController extends Controller
     {
         $messages = Message::where('conversation_id', $conversationId)
             ->with(['sender:id,name,avatar_url', 'parentMessage'])
-            ->orderBy('created_at', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->paginate(50);
 
         return response()->json($messages);
@@ -45,7 +46,7 @@ class MessageController extends Controller
         $message = Message::create([
             'conversation_id' => $conversationId,
             'sender_id' => $request->user()->id,
-            'content' => $request->content,
+            'content' => $request->getContent,
             'message_type' => $request->message_type,
             'metadata' => ! empty($metadata) ? $metadata : null,
             'reply_to_message_id' => $request->reply_to_message_id,
@@ -64,7 +65,7 @@ class MessageController extends Controller
 
         $request->validate(['content' => 'required|string']);
 
-        $message->content = $request->content;
+        $message->content = $request->getContent;
         $metadata = $message->metadata ?? [];
         $metadata['is_edited'] = true;
         $message->metadata = $metadata;
