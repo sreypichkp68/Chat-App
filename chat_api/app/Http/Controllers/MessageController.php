@@ -46,7 +46,7 @@ class MessageController extends Controller
         $message = Message::create([
             'conversation_id' => $conversationId,
             'sender_id' => $request->user()->id,
-            'content' => $request->getContent,
+            'content' => $request->input('content'),
             'message_type' => $request->message_type,
             'metadata' => ! empty($metadata) ? $metadata : null,
             'reply_to_message_id' => $request->reply_to_message_id,
@@ -65,7 +65,7 @@ class MessageController extends Controller
 
         $request->validate(['content' => 'required|string']);
 
-        $message->content = $request->getContent;
+        $message->content = $request->input('content');
         $metadata = $message->metadata ?? [];
         $metadata['is_edited'] = true;
         $message->metadata = $metadata;
