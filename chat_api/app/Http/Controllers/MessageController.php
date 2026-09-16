@@ -94,10 +94,10 @@ class MessageController extends Controller
 
     // MessageController.php
     // MessageController.php
-   public function uploadImage(Request $request)
+  public function uploadImage(Request $request)
 {
     $request->validate([
-        'file' => 'required|image|max:10240', // 10MB max
+        'file' => 'required|image|max:10240',
     ]);
 
     try {
@@ -114,15 +114,10 @@ class MessageController extends Controller
             ],
         ]);
     } catch (\Throwable $e) {
-        Log::error('CLOUDINARY UPLOAD ERROR', [
-            'message' => $e->getMessage(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-        ]);
-
         return response()->json([
             'message' => 'Cloudinary upload failed',
             'error' => $e->getMessage(),
+            'class' => get_class($e),
         ], 500);
     }
 }
