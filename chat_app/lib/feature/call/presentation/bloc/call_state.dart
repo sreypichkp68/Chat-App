@@ -36,6 +36,7 @@ class CallIncomingRinging extends CallState {
 class CallConnected extends CallState {
   final CallSession session;
   final int remoteUid;
+  final List<int> remoteUids;
   final bool isMuted;
 
   final int localUid;
@@ -44,6 +45,7 @@ class CallConnected extends CallState {
   const CallConnected(
     this.session, {
     required this.remoteUid,
+    this.remoteUids = const [],
     this.isMuted = false,
     required this.localUid,
     this.isSpeakerOn = false,
@@ -52,6 +54,7 @@ class CallConnected extends CallState {
 
   CallConnected copyWith({
     int? remoteUid,
+    List<int>? remoteUids,
     bool? isMuted,
     bool? isSpeakerOn,
     Duration? elapsed,
@@ -61,6 +64,7 @@ class CallConnected extends CallState {
       session,
        localUid: localUid,
       remoteUid: remoteUid ?? this.remoteUid,
+      remoteUids: remoteUids ?? this.remoteUids,
       isMuted: isMuted ?? this.isMuted,
       isSpeakerOn: isSpeakerOn ?? this.isSpeakerOn,
       elapsed: elapsed ?? this.elapsed,
@@ -72,6 +76,7 @@ class CallConnected extends CallState {
     session,
     localUid,
     remoteUid,
+    remoteUids,
     isMuted,
     isSpeakerOn,
     elapsed,

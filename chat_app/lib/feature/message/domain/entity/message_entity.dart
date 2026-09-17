@@ -24,6 +24,8 @@ class MessageEntity {
   });
 
   bool get isImage => messageType == 'image';
+  String get displayContent =>
+      content.trim().isNotEmpty ? content : (isImage ? 'Image' : '');
   String? get imageUrl => metadata?['imageUrl'] as String?;
   String? get localImagePath => metadata?['localPath'] as String?;
 

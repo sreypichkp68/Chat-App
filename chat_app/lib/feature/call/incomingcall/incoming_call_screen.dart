@@ -66,9 +66,11 @@ class IncomingCallScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Incoming voice call…',
-                  style: TextStyle(color: Color(0xFFAEB2B8), fontSize: 15),
+                Text(
+                  state is CallIncomingRinging && state.session.groupId != null
+                      ? 'Incoming group ${state.session.isVideo ? 'video' : 'voice'} call'
+                      : 'Incoming voice call',
+                  style: const TextStyle(color: Color(0xFFAEB2B8), fontSize: 15),
                 ),
                 const Spacer(),
                 Padding(

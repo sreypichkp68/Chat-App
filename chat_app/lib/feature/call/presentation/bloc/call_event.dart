@@ -21,6 +21,30 @@ class CallStartRequested extends CallEvent {
   List<Object?> get props => [peerId, peerName, isVideo];
 }
 
+class GroupCallStartRequested extends CallEvent {
+  final int groupId;
+  final String groupName;
+  final List<String> memberIds;
+  final bool isVideo;
+
+  const GroupCallStartRequested({
+    required this.groupId,
+    required this.groupName,
+    required this.memberIds,
+    required this.isVideo,
+  });
+
+  @override
+  List<Object?> get props => [groupId, groupName, memberIds, isVideo];
+}
+
+class CallPeerDisconnected extends CallEvent {
+  final int remoteUid;
+  const CallPeerDisconnected(this.remoteUid);
+  @override
+  List<Object?> get props => [remoteUid];
+}
+
 /// Arrived over the socket: someone is calling us.
 class CallInviteReceived extends CallEvent {
   final CallSession session;

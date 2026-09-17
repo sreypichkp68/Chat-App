@@ -4,8 +4,10 @@ import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call_event.dart';
+import 'package:chat_app/feature/call/presentation/bloc/call_state.dart';
 import 'package:chat_app/feature/call/presentation/screen/call_screen.dart';
 import 'package:chat_app/feature/group/presentation/screen/group_members_screen.dart';
+import 'package:chat_app/feature/group/data/datasource/group_remote_data_source.dart';
 import 'package:chat_app/feature/message/domain/entity/message_entity.dart';
 import 'package:chat_app/feature/message/presentation/bloc/message_bloc.dart';
 import 'package:chat_app/feature/message/presentation/bloc/message_event.dart';
@@ -96,14 +98,48 @@ class _ConversationScreenState extends State<ConversationScreen> {
     setState(() => _pendingImage = null);
   }
 
-  void _startCall({bool isVideo = true}) {
-    _callBloc.add(
-      CallStartRequested(
+  Future<void> _startCall({bool isVideo = true}) async {
+    if (_callBloc.state is! CallIdle) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Finish the current call first.')),
+      );
+      return;
+    }
+    if (widget.isGroup) {
+      try {
+        final group = await sl<GroupRemoteDataSource>().getGroup(widget.conversationId);
+        final currentUserId = _currentUserId ?? await sl<TokenStorage>().getUserId();
+        final members = group.members
+            .where((member) => member.id.toString() != currentUserId)
+            .map((member) => member.id.toString())
+            .toList();
+        if (!mounted || _callBloc.state is! CallIdle) return;
+        if (members.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Add another member before calling.')),
+          );
+          return;
+        }
+        _callBloc.add(GroupCallStartRequested(
+          groupId: widget.conversationId,
+          groupName: widget.participantName,
+          memberIds: members,
+          isVideo: isVideo,
+        ));
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start group call: $error')),
+        );
+        return;
+      }
+    } else {
+      _callBloc.add(CallStartRequested(
         peerId: widget.participantId,
         peerName: widget.participantName,
         isVideo: isVideo,
-      ),
-    );
+      ));
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => BlocProvider.value(
@@ -241,9 +277,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
             ),
           ),
-          actions: widget.isGroup
-              ? []
-              : [
+          actions: [
                   IconButton(
                     icon: const Icon(
                       Icons.call_outlined,
@@ -262,11 +296,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   IconButton(
                     icon: const Icon(Icons.more_vert, color: Color(0xFF53565C)),
                     onPressed: () {
-                      AboutUser.show(
-                        context,
-                        participantName: widget.participantName,
-                        participantId: widget.participantId,
-                      );
+                      if (widget.isGroup) {
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => GroupMembersScreen(groupId: widget.conversationId),
+                        ));
+                      } else {
+                        AboutUser.show(
+                          context,
+                          participantName: widget.participantName,
+                          participantId: widget.participantId,
+                        );
+                      }
                     },
                   ),
                   const SizedBox(width: 12),
@@ -310,7 +350,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   final message = newIncomingMessages.last;
                   Get.snackbar(
                     widget.participantName,
-                    message.content,
+                    message.displayContent,
                     snackPosition: SnackPosition.TOP,
                     duration: const Duration(seconds: 2),
                     backgroundColor: const Color(0xFF21B95F),
@@ -594,13 +634,13 @@ class _MessageBubble extends StatelessWidget {
                                 ),
                               ),
                       ),
-                    if (message.content.isNotEmpty)
+                    if (message.displayContent.isNotEmpty)
                       Padding(
                         padding: hasImage
                             ? const EdgeInsets.fromLTRB(8, 6, 8, 4)
                             : EdgeInsets.zero,
                         child: Text(
-                          message.content,
+                          message.displayContent,
                           style: TextStyle(
                             color: hasImage
                                 ? const Color(0xFF4A4D53)

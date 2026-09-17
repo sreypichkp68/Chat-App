@@ -34,12 +34,24 @@ class CallController extends Controller
             'calleeId' => 'required|integer',
             'channelName' => 'required|string',
             'isVideo' => 'required|boolean',
+            'groupId' => 'nullable|integer|exists:conversations,id',
+            'groupName' => 'nullable|string',
         ]);
+
+        abort_unless((int) $data['callerId'] === (int) $request->user()->id, 403);
+        if (isset($data['groupId'])) {
+            $group = Conversation::findOrFail($data['groupId']);
+            abort_unless($group->type === 'group', 422);
+            abort_unless($group->members()->where('user_id', $data['callerId'])->exists(), 403);
+            abort_unless($group->members()->where('user_id', $data['calleeId'])->exists(), 403);
+            abort_if((int) $data['callerId'] === (int) $data['calleeId'], 422);
+        }
 
         Call::create([
             'call_id' => $data['callId'],
             'caller_id' => $data['callerId'],
             'callee_id' => $data['calleeId'],
+            'group_id' => $data['groupId'] ?? null,
             'channel_name' => $data['channelName'],
             'type' => $data['isVideo'] ? 'video' : 'audio',
             'status' => 'ringing',
@@ -64,7 +76,10 @@ class CallController extends Controller
             'peerId' => 'required|integer',
         ]);
 
-        Call::where('call_id', $data['callId'])->update(['status' => 'accepted']);
+        $call = Call::where('call_id', $data['callId'])->firstOrFail();
+        abort_unless((int) $call->callee_id === (int) $request->user()->id, 403);
+        abort_unless((int) $data['peerId'] === (int) $call->caller_id, 403);
+        $call->update(['status' => 'accepted']);
 
         // The event is addressed to the peer's private channel, so do not use
         // toOthers(): it can suppress delivery when an X-Socket-ID is present.
@@ -80,7 +95,10 @@ class CallController extends Controller
             'peerId' => 'required|integer',
         ]);
 
-        Call::where('call_id', $data['callId'])->update([
+        $call = Call::where('call_id', $data['callId'])->firstOrFail();
+        abort_unless((int) $call->callee_id === (int) $request->user()->id, 403);
+        abort_unless((int) $data['peerId'] === (int) $call->caller_id, 403);
+        $call->update([
             'status' => 'declined',
             'ended_at' => now(),
         ]);
@@ -115,6 +133,9 @@ class CallController extends Controller
         });
 
         if ($call->ended_at !== null) {
+            if ($call->group_id !== null) {
+                return response()->json(['call' => $call, 'message' => null]);
+            }
             $existingMessage = Conversation::betweenUsers($call->caller_id, $call->callee_id)
                 ?->messages()
                 ->where('message_type', 'call_log')
@@ -134,7 +155,9 @@ class CallController extends Controller
             ? $call->ended_at->diffInSeconds($call->started_at)
             : null;
 
-        $conversation = Conversation::betweenUsers($call->caller_id, $call->callee_id);
+        $conversation = $call->group_id === null
+            ? Conversation::betweenUsers($call->caller_id, $call->callee_id)
+            : null;
         $message = null;
 
         if ($conversation) {

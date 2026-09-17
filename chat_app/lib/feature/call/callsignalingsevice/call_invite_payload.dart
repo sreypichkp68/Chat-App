@@ -13,6 +13,8 @@ class CallInvitePayload {
   final bool isVideo;
   final String calleeId;
   final String channelName;
+  final int? groupId;
+  final String? groupName;
 
   CallInvitePayload({
     required this.callId,
@@ -21,6 +23,8 @@ class CallInvitePayload {
     required this.callerName,
     required this.calleeId,
     required this.channelName,
+    this.groupId,
+    this.groupName,
   });
 
   factory CallInvitePayload.fromJson(Map<String, dynamic> json) {
@@ -31,6 +35,8 @@ class CallInvitePayload {
       calleeId: json['calleeId'].toString(),
       channelName: json['channelName'].toString(),
       isVideo: json['isVideo'] == true || json['isVideo']?.toString() == '1',
+      groupId: int.tryParse('${json['groupId']}'),
+      groupName: json['groupName']?.toString(),
     );
   }
 
@@ -41,6 +47,8 @@ class CallInvitePayload {
     'isVideo': isVideo,
     'calleeId': calleeId,
     'channelName': channelName,
+    if (groupId != null) 'groupId': groupId,
+    if (groupName != null) 'groupName': groupName,
   };
 }
 
@@ -232,6 +240,9 @@ class CallSignalingService {
       body: jsonEncode(payload.toJson()),
     );
     print('CALL INVITE RESPONSE: ${response.statusCode} ${response.body}');
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError('Could not invite member (${response.statusCode}): ${response.body}');
+    }
   }
 
   Future<void> sendAccept(String callId, String peerId) =>

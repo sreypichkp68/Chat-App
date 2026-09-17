@@ -13,6 +13,7 @@ class Call extends Model
         'call_id',
         'caller_id',
         'callee_id',
+        'group_id',
         'channel_name',
         'type',
         'status',

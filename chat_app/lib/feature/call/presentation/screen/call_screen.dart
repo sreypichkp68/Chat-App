@@ -61,7 +61,41 @@ class CallScreen extends StatelessWidget {
             backgroundColor: const Color(0xFF14171B),
             body: Stack(
               children: [
-                if (state is CallConnected && state.session.isVideo) ...[
+                if (state is CallConnected && state.session.isVideo &&
+                    state.session.groupId != null)
+                  Positioned.fill(
+                    child: GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(8, 40, 8, 180),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        childAspectRatio: 0.8,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: state.remoteUids.length + 1,
+                      itemBuilder: (context, index) => ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: index == 0
+                            ? AgoraVideoView(
+                                controller: VideoViewController(
+                                  rtcEngine: context.read<CallBloc>().engine!,
+                                  canvas: const VideoCanvas(uid: 0),
+                                ),
+                              )
+                            : AgoraVideoView(
+                                controller: VideoViewController.remote(
+                                  rtcEngine: context.read<CallBloc>().engine!,
+                                  canvas: VideoCanvas(uid: state.remoteUids[index - 1]),
+                                  connection: RtcConnection(
+                                    channelId: state.session.channelName,
+                                    localUid: state.localUid,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  )
+                else if (state is CallConnected && state.session.isVideo) ...[
                   Positioned.fill(
                     child: AgoraVideoView(
                       controller: VideoViewController.remote(
@@ -128,6 +162,11 @@ class CallScreen extends StatelessWidget {
                           shadows: textShadow,
                         ),
                       ),
+                      if (state is CallConnected && state.session.groupId != null)
+                        Text(
+                          '${state.remoteUids.length + 1} in call',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
                       const Spacer(),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 24),

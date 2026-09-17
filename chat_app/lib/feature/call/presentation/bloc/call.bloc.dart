@@ -25,6 +25,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
        _signaling = signaling,
        super(const CallIdle()) {
     on<CallStartRequested>(_onStartRequested);
+    on<GroupCallStartRequested>(_onGroupStartRequested);
     on<CallInviteReceived>(_onInviteReceived);
     on<CallAccepted>(_onAccepted);
     on<CallDeclined>(_onDeclined);
@@ -33,6 +34,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     on<CallMuteToggled>(_onMuteToggled);
     on<CallSpeakerToggled>(_onSpeakerToggled);
     on<CallPeerConnected>(_onPeerConnected);
+    on<CallPeerDisconnected>(_onPeerDisconnected);
     on<CallElapsedTicked>(_onElapsedTicked);
     _ringingStateSub = stream.listen(_watchIncomingCall);
 
@@ -45,23 +47,24 @@ class CallBloc extends Bloc<CallEvent, CallState> {
             callId: payload.callId,
             channelName: payload.channelName,
             peerId: payload.callerId,
-            peerName: payload.callerName,
+            peerName: payload.groupName ?? payload.callerName,
             direction: CallDirection.incoming,
             status: CallStatus.ringing,
             isVideo: payload.isVideo,
+            groupId: payload.groupId,
           ),
         ),
       );
     });
     _acceptedSub = _signaling.onAccepted.listen((callId) {
       final s = state;
-      if (s is CallOutgoingRinging && s.session.callId == callId) {
+      if (s is CallOutgoingRinging && s.session.groupId == null && s.session.callId == callId) {
         add(const CallAccepted());
       }
     });
     _declinedSub = _signaling.onDeclined.listen((callId) {
       final s = state;
-      if (s is CallOutgoingRinging && s.session.callId == callId) {
+      if (s is CallOutgoingRinging && s.session.groupId == null && s.session.callId == callId) {
         add(const CallDeclined());
       }
     });
@@ -76,7 +79,12 @@ class CallBloc extends Bloc<CallEvent, CallState> {
           : s is CallConnecting
           ? s.session.callId
           : null;
-      if (activeId == callId) add(const CallEndedRemotely());
+      final ignoreMemberEnd = s is CallConnected &&
+          s.session.groupId != null &&
+          s.session.direction == CallDirection.outgoing;
+      if (!ignoreMemberEnd && activeId == callId) {
+        add(const CallEndedRemotely());
+      }
     });
   }
 
@@ -91,6 +99,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
   StreamSubscription? _inviteSub, _acceptedSub, _declinedSub, _endedSub;
   final CallRepository _callRepository;
   final Set<String> _loggedCallIds = {};
+  final Map<String, Set<String>> _sentGroupInvites = {};
 
   void _watchIncomingCall(CallState next) {
     _ringingPoll?.cancel();
@@ -161,6 +170,11 @@ class CallBloc extends Bloc<CallEvent, CallState> {
         },
         onUserOffline: (connection, remoteUid, reason) {
           final s = state;
+          if (!isClosed && s is CallConnected && s.session.groupId != null &&
+              s.session.channelName == connection.channelId) {
+            add(CallPeerDisconnected(remoteUid));
+            return;
+          }
           if (!isClosed &&
               s is CallConnected &&
               s.remoteUid == remoteUid &&
@@ -222,18 +236,17 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     );
     emit(CallOutgoingRinging(session));
 
-    _signaling.sendInvite(
-      CallInvitePayload(
-        callId: callId,
-        callerId: currentUserId,
-        callerName: currentUserName,
-        calleeId: event.peerId,
-        channelName: channelName,
-        isVideo: event.isVideo,
-      ),
-    );
-
     try {
+      await _signaling.sendInvite(
+        CallInvitePayload(
+          callId: callId,
+          callerId: currentUserId,
+          callerName: currentUserName,
+          calleeId: event.peerId,
+          channelName: channelName,
+          isVideo: event.isVideo,
+        ),
+      );
       await _ensureEngine(isVideo: session.isVideo);
       final uid = _uidFor(currentUserId);
       final token = await _fetchToken(channelName, uid);
@@ -255,6 +268,87 @@ class CallBloc extends Bloc<CallEvent, CallState> {
       print('CALL START ERROR: $e\n$st');
       unawaited(_notifyRemoteCallEnded(callId, status: 'missed'));
       emit(CallFinished('Could not start call: $e'));
+      await _teardownEngine();
+      await Future.delayed(const Duration(seconds: 2));
+      if (!isClosed) emit(const CallIdle());
+    }
+  }
+
+  Future<void> _onGroupStartRequested(
+    GroupCallStartRequested event,
+    Emitter<CallState> emit,
+  ) async {
+    if (state is! CallIdle) return;
+    final members = event.memberIds.toSet()..remove(currentUserId);
+    if (members.isEmpty) return;
+    final callId = '${currentUserId}_${DateTime.now().microsecondsSinceEpoch}';
+    final channelName = 'group_call_$callId';
+    final inviteIds = members.map((id) => '${callId}_$id').toList();
+    _sentGroupInvites[callId] = <String>{};
+    final session = CallSession(
+      callId: callId,
+      channelName: channelName,
+      peerId: event.groupId.toString(),
+      peerName: event.groupName,
+      direction: CallDirection.outgoing,
+      status: CallStatus.ringing,
+      isVideo: event.isVideo,
+      groupId: event.groupId,
+      inviteCallIds: inviteIds,
+    );
+    emit(CallOutgoingRinging(session));
+    try {
+      await _ensureEngine(isVideo: session.isVideo);
+      final uid = _uidFor(currentUserId);
+      final token = await _fetchToken(channelName, uid);
+      await _engine!.joinChannel(
+        token: token,
+        channelId: channelName,
+        uid: uid,
+        options: ChannelMediaOptions(
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
+          channelProfile: ChannelProfileType.channelProfileCommunication,
+          publishCameraTrack: session.isVideo,
+          publishMicrophoneTrack: true,
+          autoSubscribeVideo: session.isVideo,
+          autoSubscribeAudio: true,
+        ),
+      );
+      final results = await Future.wait(members.toList().asMap().entries.map((entry) async {
+        try {
+          await _signaling.sendInvite(CallInvitePayload(
+            callId: inviteIds[entry.key],
+            callerId: currentUserId,
+            callerName: currentUserName,
+            calleeId: entry.value,
+            channelName: channelName,
+            isVideo: event.isVideo,
+            groupId: event.groupId,
+            groupName: event.groupName,
+          ));
+          _sentGroupInvites[callId]?.add(inviteIds[entry.key]);
+          final current = state;
+          final stillActive = current is CallOutgoingRinging && current.session.callId == callId ||
+              current is CallConnected && current.session.callId == callId;
+          if (!stillActive) {
+            unawaited(_notifyRemoteCallEnded(inviteIds[entry.key], status: 'missed'));
+          }
+          return true;
+        } catch (error) {
+          log('Could not invite group member ${entry.value}: $error');
+          return false;
+        }
+      }));
+      if (results.every((sent) => !sent)) {
+        throw StateError('Could not invite any group members.');
+      }
+    } catch (error) {
+      _sentGroupInvites.remove(callId);
+      final current = state;
+      final stillActive = current is CallOutgoingRinging && current.session.callId == callId ||
+          current is CallConnected && current.session.callId == callId;
+      if (!stillActive) return;
+      emit(CallFinished('Could not start group call: $error'));
       await _teardownEngine();
       await Future.delayed(const Duration(seconds: 2));
       if (!isClosed) emit(const CallIdle());
@@ -336,12 +430,17 @@ class CallBloc extends Bloc<CallEvent, CallState> {
       // Never wait for the API request before closing this device's call.
       // A slow/unavailable server previously left the UI and Agora session
       // active until the HTTP socket timed out.
-      unawaited(
-        _notifyRemoteCallEnded(
-          session.callId,
+      final callIds = session.groupId != null && session.direction == CallDirection.outgoing
+          ? (_sentGroupInvites.remove(session.callId)?.toList() ?? <String>[])
+          : session.inviteCallIds.isEmpty
+          ? [session.callId]
+          : session.inviteCallIds;
+      for (final id in callIds) {
+        unawaited(_notifyRemoteCallEnded(
+          id,
           status: s is CallConnected ? 'ended' : 'missed',
-        ),
-      );
+        ));
+      }
     }
     emit(const CallFinished('Call ended'));
     await _teardownEngine();
@@ -399,6 +498,12 @@ class CallBloc extends Bloc<CallEvent, CallState> {
 
   void _onPeerConnected(CallPeerConnected event, Emitter<CallState> emit) {
     final s = state;
+    if (s is CallConnected) {
+      if (s.session.groupId != null && !s.remoteUids.contains(event.remoteUid)) {
+        emit(s.copyWith(remoteUids: [...s.remoteUids, event.remoteUid]));
+      }
+      return;
+    }
     final session = s is CallOutgoingRinging
         ? s.session
         : s is CallIncomingRinging
@@ -412,6 +517,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
       CallConnected(
         session,
         remoteUid: event.remoteUid,
+        remoteUids: [event.remoteUid],
         localUid: _uidFor(currentUserId),
       ),
     );
@@ -419,6 +525,16 @@ class CallBloc extends Bloc<CallEvent, CallState> {
     _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!isClosed) add(const CallElapsedTicked());
     });
+  }
+
+  void _onPeerDisconnected(CallPeerDisconnected event, Emitter<CallState> emit) {
+    final s = state;
+    if (s is! CallConnected || s.session.groupId == null) return;
+    final remaining = s.remoteUids.where((uid) => uid != event.remoteUid).toList();
+    emit(s.copyWith(
+      remoteUid: remaining.isEmpty ? 0 : remaining.first,
+      remoteUids: remaining,
+    ));
   }
 
   void _onElapsedTicked(CallElapsedTicked event, Emitter<CallState> emit) {
