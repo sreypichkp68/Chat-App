@@ -74,7 +74,7 @@ class MessageBloc extends Bloc<MessageEvent, MessageState> {
   ) async {
     // 1. Optimistic local message so it appears instantly, before upload/send resolve.
     final optimisticId = -DateTime.now()
-        .millisecondsSinceEpoch; // negative = temp id, avoids clashing with real server ids
+        .microsecondsSinceEpoch; // negative = temp id, avoids clashing with real server ids
     final optimisticMessage = MessageEntity(
       id: optimisticId,
       conversationId: event.conversationId,
@@ -100,13 +100,11 @@ class MessageBloc extends Bloc<MessageEvent, MessageState> {
         imageFile: event.imageFile,
       );
 
-      // 2. Replace the optimistic entry with the confirmed server message.
-      final index = _messages.indexWhere((m) => m.id == optimisticId);
-      if (index != -1) {
-        _messages[index] = msg;
-      } else {
-        _messages.add(msg);
-      }
+      // The socket or refresh may have added the server message before this
+      // request finished. Keep one confirmed copy in either order.
+      _messages.removeWhere((m) => m.id == optimisticId || m.id == msg.id);
+      _messages.add(msg);
+      _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       emit(MessageLoaded(List.of(_messages)));
     } catch (e) {
       print('DEBUG SEND ERROR: $e'); // new

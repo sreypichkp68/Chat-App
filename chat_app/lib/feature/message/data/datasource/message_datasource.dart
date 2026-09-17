@@ -25,6 +25,7 @@ class ConversationSummary {
   final int id;
   final String participantId;
   final String participantName;
+  final bool isGroup;
   final String lastMessage;
   final DateTime? lastMessageAt;
   final String? lastMessageSenderId;
@@ -33,6 +34,7 @@ class ConversationSummary {
     required this.id,
     required this.participantId,
     required this.participantName,
+    required this.isGroup,
     required this.lastMessage,
     required this.lastMessageAt,
     required this.lastMessageSenderId,
@@ -42,6 +44,7 @@ class ConversationSummary {
     Map<String, dynamic> json, {
     String? currentUserId,
   }) {
+    final isGroup = json['type'] == 'group';
     // Laravel APIs often call the other user `other_user`, `receiver`, or
     // `contact` instead of `participant`. Accept all of these response shapes.
     final directParticipant = _firstMap(json, const [
@@ -113,10 +116,15 @@ class ConversationSummary {
 
     return ConversationSummary(
       id: int.parse(json['id'].toString()),
-      participantId: participant['id'].toString(),
-      participantName: (name != null && name.isNotEmpty)
+      participantId: isGroup
+          ? json['id'].toString()
+          : participant['id'].toString(),
+      participantName: isGroup
+          ? (json['title']?.toString() ?? 'Group')
+          : (name != null && name.isNotEmpty)
           ? name
           : 'Unknown user',
+      isGroup: isGroup,
       lastMessage: previewText,
       lastMessageAt: createdAt is String ? DateTime.tryParse(createdAt) : null,
       lastMessageSenderId: lastMessage['sender_id']?.toString(),

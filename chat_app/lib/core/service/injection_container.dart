@@ -20,6 +20,7 @@ import 'package:chat_app/feature/call/data/repositoryImpl/call_repo_impl.dart';
 import 'package:chat_app/feature/call/domain/reposity/call_repository.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
 import 'package:chat_app/feature/friends/data/datasource/friend_request_remote_datasource.dart';
+import 'package:chat_app/feature/group/data/datasource/group_remote_data_source.dart';
 import 'package:chat_app/feature/group/data/repository_impl/group_repository_impl.dart';
 import 'package:chat_app/feature/group/domain/repository/group_repository.dart';
 import 'package:chat_app/feature/group/domain/usercase/create_group_usecase.dart';
@@ -73,8 +74,6 @@ void initDependencies() {
     () => MessageDataSourceImpl(client: sl(), tokenStorage: sl()),
   );
 
-
-
   sl.registerLazySingleton<MessageSocketDataSource>(
     () => MessageSocketDataSourceImpl(tokenStorage: TokenStorage()),
   );
@@ -101,11 +100,20 @@ void initDependencies() {
   );
   sl.registerFactory(() => SearchUsersUsecase(sl<UserSearchRepo>()));
   sl.registerFactory(() => SearchUsersBloc(sl<SearchUsersUsecase>()));
+  sl.registerLazySingleton<GroupRemoteDataSource>(
+    () => GroupRemoteDataSourceImpl(client: sl(), tokenStorage: sl()),
+  );
+  sl.registerLazySingleton<GroupRepository>(
+    () => GroupRepositoryImpl(sl<GroupRemoteDataSource>()),
+  );
+  sl.registerFactory(
+    () => GroupBloc(CreateGroupUsecase(sl<GroupRepository>())),
+  );
   sl.registerLazySingleton<FriendRequestRemoteDatasource>(
     () => FriendRequestRemoteDatasourceImpl(client: sl(), tokenStorage: sl()),
   );
   sl.registerLazySingleton(() => CallSignalingService(sl()));
-  
+
   sl.registerLazySingleton<CallRemoteDataSource>(
     () => CallRemotedataSource(sl<TokenStorage>()),
   );
@@ -166,7 +174,8 @@ Future<void> registerCallBloc() async {
           userId: userId,
           show: NotificationService.instance.showMessage,
           isBackground: () =>
-              WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed,
+              WidgetsBinding.instance.lifecycleState !=
+              AppLifecycleState.resumed,
         )..start(signaling.client);
         return bloc;
       } catch (_) {

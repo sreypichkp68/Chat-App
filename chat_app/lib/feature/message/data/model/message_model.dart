@@ -5,6 +5,7 @@ class MessageModel extends MessageEntity {
     required super.id,
     required super.conversationId,
     required super.senderId,
+    super.senderName,
     required super.content,
     required super.messageType,
     super.metadata,
@@ -18,6 +19,9 @@ class MessageModel extends MessageEntity {
       id: _asInt(json['id']),
       conversationId: _asInt(json['conversation_id']),
       senderId: _asInt(json['sender_id']),
+      senderName: json['sender'] is Map
+          ? (json['sender'] as Map)['name']?.toString()
+          : json['sender_name']?.toString(),
       content: json['content'] as String? ?? '',
       messageType: json['message_type'] as String? ?? 'text',
       metadata: json['metadata'] is Map
@@ -41,6 +45,7 @@ class MessageModel extends MessageEntity {
       'id': id,
       'conversation_id': conversationId,
       'sender_id': senderId,
+      'sender_name': senderName,
       'content': content,
       'message_type': messageType,
       'metadata': metadata,

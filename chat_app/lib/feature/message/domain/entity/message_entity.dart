@@ -2,6 +2,7 @@ class MessageEntity {
   final int id;
   final int conversationId;
   final int senderId;
+  final String? senderName;
   final String content;
   final String messageType;
   final Map<String, dynamic>? metadata;
@@ -13,6 +14,7 @@ class MessageEntity {
     required this.id,
     required this.conversationId,
     required this.senderId,
+    this.senderName,
     required this.content,
     required this.messageType,
     this.metadata,
@@ -26,7 +28,7 @@ class MessageEntity {
   String? get localImagePath => metadata?['localPath'] as String?;
 
   // --- call log ---
- bool get isCallLog => messageType == 'call_log';
+  bool get isCallLog => messageType == 'call_log';
   String? get callStatus => metadata?['status'] as String?;
   String? get callType => metadata?['call_type'] as String?;
   int? get callDurationSeconds {

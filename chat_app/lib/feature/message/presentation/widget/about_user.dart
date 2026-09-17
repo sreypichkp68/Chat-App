@@ -1,17 +1,27 @@
+import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/feature/group/presentation/screen/adduser_group.dart';
-import 'package:chat_app/feature/searchusers/domain/usecase/search_user_usecase.dart';
+import 'package:chat_app/feature/group/presentation/bloc/group_bloc.dart';
+import 'package:chat_app/feature/searchusers/domain/entity/user_entity.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:get_it/get_it.dart';
 
 class AboutUser extends StatelessWidget {
   final String participantName;
+  final String participantId;
 
-  const AboutUser({super.key, required this.participantName});
+  const AboutUser({
+    super.key,
+    required this.participantName,
+    required this.participantId,
+  });
 
   /// Helper method to display the modal bottom sheet easily from anywhere
-  static void show(BuildContext context, {required String participantName}) {
+  static void show(
+    BuildContext context, {
+    required String participantName,
+    required String participantId,
+  }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -21,7 +31,10 @@ class AboutUser extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => AboutUser(participantName: participantName),
+      builder: (context) => AboutUser(
+        participantName: participantName,
+        participantId: participantId,
+      ),
     );
   }
 
@@ -107,16 +120,22 @@ class AboutUser extends StatelessWidget {
                     icon: Icons.group_add_outlined,
                     title: 'Create group chat with $participantName',
                     onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
+                      final navigator = Navigator.of(context);
+                      navigator.pop();
+                      navigator.push(
                         MaterialPageRoute(
-                          builder: (context) => BlocProvider(
-                            create: (context) => SearchUsersBloc(
-                              GetIt.instance<SearchUsersUsecase>(),
-                            ),
+                          builder: (_) => MultiBlocProvider(
+                            providers: [
+                              BlocProvider(
+                                create: (_) => sl<SearchUsersBloc>(),
+                              ),
+                              BlocProvider(create: (_) => sl<GroupBloc>()),
+                            ],
                             child: AdduserGroup(
-                              initialSelectedUser: participantName,
+                              initialSelectedUser: UserEntity(
+                                id: participantId,
+                                name: participantName,
+                              ),
                             ),
                           ),
                         ),

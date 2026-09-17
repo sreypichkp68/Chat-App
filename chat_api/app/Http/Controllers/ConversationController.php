@@ -21,7 +21,7 @@ class ConversationController extends Controller
 
     $conversations->each(function ($conversation) use ($user) {
         $lastMessage = $conversation->lastMessage;
-        $lastCall = $conversation->lastCall();
+        $lastCall = $conversation->type === 'direct' ? $conversation->lastCall() : null;
 
         $lastMessageAt = $lastMessage?->created_at;
         $lastCallAt = $lastCall?->started_at;

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:chat_app/core/service/injection_container.dart';
+import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call_event.dart';
 import 'package:chat_app/feature/call/presentation/screen/call_screen.dart';
@@ -19,12 +20,14 @@ class ConversationScreen extends StatefulWidget {
   final int conversationId;
   final String participantId;
   final String participantName;
+  final bool isGroup;
 
   const ConversationScreen({
     super.key,
     required this.conversationId,
     required this.participantId,
     required this.participantName,
+    this.isGroup = false,
   });
 
   @override
@@ -39,6 +42,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   late final MessageBloc _messageBloc;
   final _imagePicker = ImagePicker();
   late final CallBloc _callBloc;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -46,13 +50,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _messageBloc = sl<MessageBloc>()
       ..add(MessageLoadRequested(conversationId: widget.conversationId));
     _callBloc = sl<CallBloc>();
+    sl<TokenStorage>().getUserId().then((id) {
+      if (mounted) setState(() => _currentUserId = id);
+    });
   }
 
   @override
   void dispose() {
     _composer.dispose();
     _scrollController.dispose();
-    
+
     super.dispose();
   }
 
@@ -178,9 +185,15 @@ class _ConversationScreenState extends State<ConversationScreen> {
           titleSpacing: 0,
           title: InkWell(
             borderRadius: BorderRadius.circular(8),
-            onTap: () {
-              AboutUser.show(context, participantName: widget.participantName);
-            },
+            onTap: widget.isGroup
+                ? null
+                : () {
+                    AboutUser.show(
+                      context,
+                      participantName: widget.participantName,
+                      participantId: widget.participantId,
+                    );
+                  },
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
@@ -189,12 +202,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor: const Color(0xFF34C471),
-                    child: Text(
-                      widget.participantName.isEmpty
-                          ? '?'
-                          : widget.participantName[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                    ),
+                    child: widget.isGroup
+                        ? const Icon(Icons.group, color: Colors.white, size: 19)
+                        : Text(
+                            widget.participantName.isEmpty
+                                ? '?'
+                                : widget.participantName[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -209,30 +227,36 @@ class _ConversationScreenState extends State<ConversationScreen> {
               ),
             ),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.call_outlined, color: Color(0xFF53565C)),
-              onPressed: () => _startCall(isVideo: false),
-            ),
-            IconButton(
-              icon: const Icon(
-                Icons.videocam_outlined,
-                color: Color(0xFF53565C),
-              ),
-              onPressed: () => _startCall(isVideo: true),
-            ),
-            const SizedBox(width: 6),
-            IconButton(
-              icon: const Icon(Icons.more_vert, color: Color(0xFF53565C)),
-              onPressed: () {
-                AboutUser.show(
-                  context,
-                  participantName: widget.participantName,
-                );
-              },
-            ),
-            const SizedBox(width: 12),
-          ],
+          actions: widget.isGroup
+              ? []
+              : [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.call_outlined,
+                      color: Color(0xFF53565C),
+                    ),
+                    onPressed: () => _startCall(isVideo: false),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.videocam_outlined,
+                      color: Color(0xFF53565C),
+                    ),
+                    onPressed: () => _startCall(isVideo: true),
+                  ),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, color: Color(0xFF53565C)),
+                    onPressed: () {
+                      AboutUser.show(
+                        context,
+                        participantName: widget.participantName,
+                        participantId: widget.participantId,
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                ],
         ),
         body: Column(
           children: [
@@ -243,9 +267,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   _scrollToLatest();
 
                   final newIncomingMessages = state.messages.where((message) {
+                    final incoming = widget.isGroup
+                        ? message.id > 0 &&
+                              _currentUserId != null &&
+                              message.senderId.toString() != _currentUserId
+                        : message.senderId.toString() == widget.participantId;
                     return _hasLoadedInitialMessages &&
                         !_seenMessageIds.contains(message.id) &&
-                        message.senderId.toString() == widget.participantId;
+                        incoming;
                   }).toList();
                   _seenMessageIds.addAll(
                     state.messages.map((message) => message.id),
@@ -300,15 +329,20 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         );
 
                       final message = messages[index - 1];
-                      final sentByMe =
-                          message.senderId.toString() != widget.participantId;
+                      final sentByMe = widget.isGroup
+                          ? message.id < 0 ||
+                                message.senderId.toString() == _currentUserId
+                          : message.senderId.toString() != widget.participantId;
 
                       return _MessageBubble(
                         message: message,
                         sentByMe: sentByMe,
+                        senderName: widget.isGroup && !sentByMe
+                            ? message.senderName ?? 'User ${message.senderId}'
+                            : null,
                         time: _formatMessageTime(message.createdAt),
                         onTap: () => _showMessageActions(message),
-                        onCallBack: message.isCallLog
+                        onCallBack: message.isCallLog && !widget.isGroup
                             ? () {
                                 final callType =
                                     message.metadata?['call_type'] as String?;
@@ -430,12 +464,14 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     required this.sentByMe,
+    this.senderName,
     required this.time,
     required this.onTap,
     this.onCallBack,
   });
   final MessageEntity message;
   final bool sentByMe;
+  final String? senderName;
   final String time;
   final VoidCallback onTap;
   final VoidCallback? onCallBack;
@@ -468,6 +504,18 @@ class _MessageBubble extends StatelessWidget {
               ? CrossAxisAlignment.end
               : CrossAxisAlignment.start,
           children: [
+            if (senderName != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
+                child: Text(
+                  senderName!,
+                  style: const TextStyle(
+                    color: Color(0xFF4A4D53),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             GestureDetector(
               onTap: onTap,
               onLongPress: onTap,

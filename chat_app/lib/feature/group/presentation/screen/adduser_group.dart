@@ -8,9 +8,10 @@ import 'package:chat_app/feature/group/presentation/bloc/group_state.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_bloc.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_event.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user.state.dart';
+import 'package:chat_app/feature/searchusers/domain/entity/user_entity.dart';
 
 class AdduserGroup extends StatefulWidget {
-  final String? initialSelectedUser;
+  final UserEntity? initialSelectedUser;
 
   const AdduserGroup({super.key, this.initialSelectedUser});
 
@@ -23,7 +24,14 @@ class _AdduserGroupState extends State<AdduserGroup> {
   final TextEditingController _searchController = TextEditingController();
 
   // Stores selected users' data
-  final Map<String, dynamic> _selectedUsers = {};
+  final Map<String, UserEntity> _selectedUsers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final initialUser = widget.initialSelectedUser;
+    if (initialUser != null) _selectedUsers[initialUser.id] = initialUser;
+  }
 
   @override
   void dispose() {
@@ -32,7 +40,7 @@ class _AdduserGroupState extends State<AdduserGroup> {
     super.dispose();
   }
 
-  void _toggleUserSelection(dynamic user) {
+  void _toggleUserSelection(UserEntity user) {
     setState(() {
       if (_selectedUsers.containsKey(user.id)) {
         _selectedUsers.remove(user.id);
@@ -46,6 +54,7 @@ class _AdduserGroupState extends State<AdduserGroup> {
   Widget build(BuildContext context) {
     // Helper getter for the UI horizontal list
     final selectedUsersList = _selectedUsers.values.toList();
+    final creating = context.watch<GroupBloc>().state is GroupLoading;
 
     return BlocListener<GroupBloc, GroupState>(
       listener: (context, state) {
@@ -53,10 +62,10 @@ class _AdduserGroupState extends State<AdduserGroup> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => ConversationScreen(
-                conversationId: state.group.id, // int
-                participantId: state.group.id.toString(), // String
-                participantName:
-                    state.group.title, // String (uses 'title' from GroupEntity)
+                conversationId: state.group.id,
+                participantId: state.group.id.toString(),
+                participantName: state.group.title,
+                isGroup: true,
               ),
             ),
           );
@@ -67,27 +76,45 @@ class _AdduserGroupState extends State<AdduserGroup> {
         }
       },
       child: Scaffold(
+        backgroundColor: const Color(0xFF1E1E1E),
         appBar: AppBar(
+          backgroundColor: const Color(0xFF1E1E1E),
+          foregroundColor: Colors.white,
           title: const Text('New group'),
           actions: [
             TextButton(
-              onPressed: _selectedUsers.isEmpty
+              onPressed: _selectedUsers.isEmpty || creating
                   ? null
                   : () {
                       final groupName = _groupNameController.text.trim().isEmpty
                           ? _selectedUsers.values.map((u) => u.name).join(', ')
                           : _groupNameController.text.trim();
 
-                      final memberIds = _selectedUsers.keys.toList();
+                      final memberIds = _selectedUsers.keys
+                          .map(int.tryParse)
+                          .whereType<int>()
+                          .toList();
+                      if (memberIds.length != _selectedUsers.length) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Invalid member ID.')),
+                        );
+                        return;
+                      }
 
                       context.read<GroupBloc>().add(
-                        CreateGroupRequested(
-                          name: groupName,
+                        CreateGroupSubmitted(
+                          title: groupName,
                           memberIds: memberIds,
                         ),
                       );
                     },
-              child: const Text('Create'),
+              child: creating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Create'),
             ),
           ],
         ),

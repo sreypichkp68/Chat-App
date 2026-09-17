@@ -27,7 +27,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   late Future<int> _friendRequestCount;
   late Future<List<ConversationSummary>> _conversations;
-  Timer? _conversationRefreshTimer;
+ // Timer? _conversationRefreshTimer;
   final Map<int, String> _lastMessageKeys = {};
   bool _hasConversationSnapshot = false;
 
@@ -39,13 +39,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
     _friendRequestCount = _loadFriendRequestCount();
     _conversations = _loadConversations();
-    _conversationRefreshTimer = Timer.periodic(
-      const Duration(seconds: 2),
-      (_) => _refreshConversations(),
-    );
+    // _conversationRefreshTimer = Timer.periodic(
+    //   const Duration(seconds: 2),
+    //   (_) => _refreshConversations(),
+    // );
   }
 
   @override
@@ -79,7 +79,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       for (final conversation in conversations) {
         final key = _messageKey(conversation);
         final previousKey = _lastMessageKeys[conversation.id];
-        final isNewIncoming = _hasConversationSnapshot &&
+        final isNewIncoming =
+            _hasConversationSnapshot &&
             currentUserId != null &&
             previousKey != null &&
             previousKey != key &&
@@ -183,6 +184,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     required int conversationId,
     required String participantId,
     required String participantName,
+    bool isGroup = false,
   }) async {
     await Navigator.of(context).push(
       MaterialPageRoute(
@@ -190,6 +192,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           conversationId: conversationId,
           participantId: participantId,
           participantName: participantName,
+          isGroup: isGroup,
         ),
       ),
     );
@@ -204,8 +207,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    _conversationRefreshTimer?.cancel();
-     WidgetsBinding.instance.removeObserver(this);
+   // _conversationRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
@@ -410,7 +413,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                     conversation.participantName.isEmpty
                                         ? '?'
                                         : conversation.participantName[0]
-                                            .toUpperCase(),
+                                              .toUpperCase(),
                                     style: const TextStyle(color: Colors.white),
                                   ),
                                 ),
@@ -433,6 +436,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   conversationId: conversation.id,
                                   participantId: conversation.participantId,
                                   participantName: conversation.participantName,
+                                  isGroup: conversation.isGroup,
                                 ),
                               ),
                             );
