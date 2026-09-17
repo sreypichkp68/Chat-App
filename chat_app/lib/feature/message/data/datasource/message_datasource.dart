@@ -86,7 +86,13 @@ class ConversationSummary {
       }
       final status = meta['status'] as String?;
       final duration = meta['duration_seconds'] as int?;
-      if (status == 'missed') {
+      if (meta['group_id'] != null) {
+        previewText = status == 'missed'
+            ? 'Missed group call'
+            : duration != null && duration > 0
+            ? 'Group call · ${duration ~/ 60}:${(duration % 60).toString().padLeft(2, '0')}'
+            : 'Group call ended';
+      } else if (status == 'missed') {
         previewText = 'Missed call';
       } else if (status == 'declined') {
         previewText = 'Declined call';

@@ -688,6 +688,7 @@ class _CallLogBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = message.callStatus ?? 'ended';
+    final isGroupCall = message.isGroupCallLog;
     final isVideo = message.callType == 'video';
     final duration = message.callDurationSeconds;
     final isMissedForMe = status == 'missed' && !sentByMe;
@@ -702,20 +703,23 @@ class _CallLogBubble extends StatelessWidget {
         iconColor = const Color(0xFFE0433C);
         label = sentByMe
             ? 'No answer'
-            : 'Missed ${isVideo ? 'video ' : ''}call';
+            : 'Missed ${isGroupCall ? 'group ' : ''}${isVideo ? 'video ' : ''}call';
         break;
       case 'declined':
         icon = Icons.call_end_rounded;
         iconColor = const Color(0xFFE0433C);
-        label = sentByMe ? 'Call declined' : 'You declined';
+        label = isGroupCall
+            ? 'Group call declined'
+            : sentByMe ? 'Call declined' : 'You declined';
         break;
       case 'ended':
       default:
         icon = isVideo ? Icons.videocam_rounded : Icons.call_rounded;
         iconColor = const Color(0xFF6E7178);
+        final callName = isGroupCall ? 'Group call' : 'Call';
         label = (duration != null && duration > 0)
-            ? 'Call · ${_formatDuration(duration)}'
-            : 'Call ended';
+            ? '$callName · ${_formatDuration(duration)}'
+            : '$callName ended';
         break;
     }
 

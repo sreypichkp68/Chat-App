@@ -31,6 +31,7 @@ class MessageEntity {
 
   // --- call log ---
   bool get isCallLog => messageType == 'call_log';
+  bool get isGroupCallLog => isCallLog && metadata?['group_id'] != null;
   String? get callStatus => metadata?['status'] as String?;
   String? get callType => metadata?['call_type'] as String?;
   int? get callDurationSeconds {

@@ -14,6 +14,7 @@ class Call extends Model
         'caller_id',
         'callee_id',
         'group_id',
+        'caller_left_at',
         'channel_name',
         'type',
         'status',
@@ -24,6 +25,7 @@ class Call extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'caller_left_at' => 'datetime',
     ];
 
     public function caller()

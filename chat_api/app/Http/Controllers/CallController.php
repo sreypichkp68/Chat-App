@@ -116,6 +116,11 @@ class CallController extends Controller
     ]);
 
     return DB::transaction(function () use ($callId, $data, $request) {
+        $initialCall = Call::where('call_id', $callId)->firstOrFail();
+        // Serialize all hangups in one group channel before checking whether
+        // the last participant has left. Each invite has its own call row.
+        $group = $initialCall->group_id === null ? null
+            : Conversation::whereKey($initialCall->group_id)->lockForUpdate()->first();
         $call = Call::where('call_id', $callId)->lockForUpdate()->firstOrFail();
 
         $currentUserId = (int) $request->user()->id;
@@ -132,10 +137,24 @@ class CallController extends Controller
             broadcast(new \App\Events\CallEnded($callId, (string) $peerId));
         });
 
-        if ($call->ended_at !== null) {
-            if ($call->group_id !== null) {
-                return response()->json(['call' => $call, 'message' => null]);
+        if ($call->group_id !== null) {
+            $updates = [];
+            if ($call->ended_at === null) {
+                $updates['status'] = $data['status'];
+                $updates['ended_at'] = now();
             }
+            if ($currentUserId === $callerId && $call->caller_left_at === null) {
+                $updates['caller_left_at'] = now();
+            }
+            if ($updates) {
+                $call->update($updates);
+            }
+            $message = $group ? $this->recordGroupCallHistory($group, $call) : null;
+
+            return response()->json(['call' => $call, 'message' => $message]);
+        }
+
+        if ($call->ended_at !== null) {
             $existingMessage = Conversation::betweenUsers($call->caller_id, $call->callee_id)
                 ?->messages()
                 ->where('message_type', 'call_log')
@@ -179,6 +198,50 @@ class CallController extends Controller
         return response()->json(['call' => $call, 'message' => $message]);
     });
 }
+
+    private function recordGroupCallHistory(Conversation $group, Call $call): ?\App\Models\Message
+    {
+        $calls = Call::where('group_id', $group->id)
+            ->where('channel_name', $call->channel_name);
+        if ((clone $calls)->whereNull('ended_at')->exists()) {
+            return null;
+        }
+        if ((clone $calls)->whereNotNull('caller_left_at')->doesntExist()) {
+            return null;
+        }
+
+        $existing = $group->messages()
+            ->where('message_type', 'call_log')
+            ->where('metadata->channel_name', $call->channel_name)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $firstCall = (clone $calls)->orderBy('started_at')->firstOrFail();
+        $lastEndedAt = (clone $calls)->max('ended_at');
+        $duration = $firstCall->started_at && $lastEndedAt
+            ? $firstCall->started_at->diffInSeconds($lastEndedAt)
+            : null;
+        $hadParticipant = (clone $calls)->where('status', 'ended')->exists();
+        $message = $group->messages()->create([
+            'sender_id' => $firstCall->caller_id,
+            'message_type' => 'call_log',
+            'metadata' => [
+                'group_id' => $group->id,
+                'channel_name' => $call->channel_name,
+                'call_type' => $call->type,
+                'status' => $hadParticipant ? 'ended' : 'missed',
+                'duration_seconds' => $duration,
+                'caller_id' => $firstCall->caller_id,
+            ],
+        ]);
+        DB::afterCommit(function () use ($message) {
+            broadcast(new MessageSent($message));
+        });
+
+        return $message;
+    }
 
     /**
      * Issues an Agora RTC token for the given channel/uid pair, so the
