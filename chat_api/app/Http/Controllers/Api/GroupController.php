@@ -9,6 +9,19 @@ use Illuminate\Support\Facades\DB;
 
 class GroupController extends Controller
 {
+    public function show(Request $request, Conversation $group)
+    {
+        if ($group->type !== 'group') {
+            return response()->json(['message' => 'This conversation is not a group'], 422);
+        }
+
+        abort_unless($group->users()->where('users.id', $request->user()->id)->exists(), 403);
+
+        return response()->json([
+            'conversation' => $group->load('users:id,name,avatar_url'),
+        ]);
+    }
+
     //
     /**
      * Create a new group conversation.

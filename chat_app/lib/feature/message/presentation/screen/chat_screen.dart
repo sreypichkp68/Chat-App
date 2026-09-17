@@ -27,7 +27,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _searchController = TextEditingController();
   late Future<int> _friendRequestCount;
   late Future<List<ConversationSummary>> _conversations;
- // Timer? _conversationRefreshTimer;
+  Timer? _conversationRefreshTimer;
+  List<ConversationSummary>? _visibleConversations;
+  bool _initialLoadInProgress = true;
+  bool _refreshInProgress = false;
   final Map<int, String> _lastMessageKeys = {};
   bool _hasConversationSnapshot = false;
 
@@ -41,11 +44,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _friendRequestCount = _loadFriendRequestCount();
-    _conversations = _loadConversations();
-    // _conversationRefreshTimer = Timer.periodic(
-    //   const Duration(seconds: 2),
-    //   (_) => _refreshConversations(),
-    // );
+    _conversations = _loadConversations()
+        .then((conversations) {
+          _visibleConversations = conversations;
+          for (final conversation in conversations) {
+            _lastMessageKeys[conversation.id] = _messageKey(conversation);
+          }
+          _hasConversationSnapshot = true;
+          return conversations;
+        })
+        .whenComplete(() => _initialLoadInProgress = false);
+    _conversationRefreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted &&
+          !_initialLoadInProgress &&
+          ModalRoute.of(context)?.isCurrent == true) {
+        _refreshConversations();
+      }
+    });
   }
 
   @override
@@ -70,6 +85,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshConversations() async {
+    if (_refreshInProgress) return;
+    _refreshInProgress = true;
     try {
       final conversations = await _loadConversations();
       final currentUserId = await sl<TokenStorage>().getUserId();
@@ -90,9 +107,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
       _hasConversationSnapshot = true;
 
-      setState(() {
-        _conversations = Future.value(conversations);
-      });
+      if (!_sameConversations(_visibleConversations, conversations)) {
+        setState(() {
+          _visibleConversations = conversations;
+          _conversations = Future.value(conversations);
+        });
+      }
 
       if (incoming.isNotEmpty) {
         final latest = incoming.first;
@@ -108,7 +128,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
     } catch (_) {
       // Preserve the visible chat list while a background refresh fails.
+    } finally {
+      _refreshInProgress = false;
     }
+  }
+
+  bool _sameConversations(
+    List<ConversationSummary>? previous,
+    List<ConversationSummary> next,
+  ) {
+    if (previous == null || previous.length != next.length) return false;
+    for (var i = 0; i < next.length; i++) {
+      final before = previous[i];
+      final after = next[i];
+      if (before.id != after.id ||
+          before.participantId != after.participantId ||
+          before.participantName != after.participantName ||
+          before.isGroup != after.isGroup ||
+          before.lastMessage != after.lastMessage ||
+          before.lastMessageAt != after.lastMessageAt) {
+        return false;
+      }
+    }
+    return true;
   }
 
   String _formatChatTime(DateTime? value) {
@@ -197,17 +239,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       ),
     );
 
-    // The chat screen remains alive beneath the conversation route, so its
-    // cached Future must be replaced to show the newest message and timestamp.
     if (!mounted) return;
-    setState(() {
-      _conversations = _loadConversations();
-    });
+    await _refreshConversations();
   }
 
   @override
   void dispose() {
-   // _conversationRefreshTimer?.cancel();
+    _conversationRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
@@ -247,8 +285,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           if (mounted) {
                             setState(() {
                               _friendRequestCount = _loadFriendRequestCount();
-                              _conversations = _loadConversations();
                             });
+                            _refreshConversations();
                           }
                         },
                         icon: FutureBuilder<int>(
@@ -367,13 +405,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   if (state is SearchUsersInitial) {
                     return FutureBuilder<List<ConversationSummary>>(
                       future: _conversations,
+                      initialData: _visibleConversations,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState != ConnectionState.done) {
+                        if (!snapshot.hasData &&
+                            snapshot.connectionState != ConnectionState.done) {
                           return const Center(
                             child: CircularProgressIndicator(),
                           );
                         }
-                        if (snapshot.hasError) {
+                        if (snapshot.hasError && !snapshot.hasData) {
                           return Center(
                             child: Text(
                               'Could not load conversations: ${snapshot.error}',

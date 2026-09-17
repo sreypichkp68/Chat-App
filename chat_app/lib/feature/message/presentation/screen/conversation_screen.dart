@@ -5,6 +5,7 @@ import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call_event.dart';
 import 'package:chat_app/feature/call/presentation/screen/call_screen.dart';
+import 'package:chat_app/feature/group/presentation/screen/group_members_screen.dart';
 import 'package:chat_app/feature/message/domain/entity/message_entity.dart';
 import 'package:chat_app/feature/message/presentation/bloc/message_bloc.dart';
 import 'package:chat_app/feature/message/presentation/bloc/message_event.dart';
@@ -39,6 +40,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final _scrollController = ScrollController();
   final Set<int> _seenMessageIds = {};
   bool _hasLoadedInitialMessages = false;
+  int? _lastVisibleMessageId;
   late final MessageBloc _messageBloc;
   final _imagePicker = ImagePicker();
   late final CallBloc _callBloc;
@@ -149,11 +151,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
     );
   }
 
-  void _scrollToLatest() {
+  void _scrollToLatest({required bool jump}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if (jump) {
+        _scrollController.jumpTo(target);
+        return;
+      }
+      if ((target - _scrollController.offset).abs() < 16) return;
       _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
+        target,
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
       );
@@ -186,7 +194,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
           title: InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: widget.isGroup
-                ? null
+                ? () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => GroupMembersScreen(
+                        groupId: widget.conversationId,
+                      ),
+                    ),
+                  )
                 : () {
                     AboutUser.show(
                       context,
@@ -264,7 +278,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
               child: BlocConsumer<MessageBloc, MessageState>(
                 listener: (_, state) {
                   if (state is! MessageLoaded) return;
-                  _scrollToLatest();
+                  final latestId = state.messages.isEmpty
+                      ? null
+                      : state.messages.last.id;
+                  final isInitialLoad = !_hasLoadedInitialMessages;
+                  final isNearBottom = !_scrollController.hasClients ||
+                      _scrollController.position.extentAfter < 80;
+                  if (latestId != null &&
+                      latestId != _lastVisibleMessageId &&
+                      (isInitialLoad || isNearBottom)) {
+                    _scrollToLatest(jump: isInitialLoad);
+                  }
+                  _lastVisibleMessageId = latestId;
 
                   final newIncomingMessages = state.messages.where((message) {
                     final incoming = widget.isGroup
