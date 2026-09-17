@@ -1,5 +1,9 @@
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
+import 'package:chat_app/core/service/injection_container.dart';
+import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
+import 'package:chat_app/feature/message/data/model/message_model.dart';
+import 'package:chat_app/feature/message/presentation/screen/conversation_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/call_event.dart';
@@ -61,17 +65,19 @@ class CallScreen extends StatelessWidget {
             backgroundColor: const Color(0xFF14171B),
             body: Stack(
               children: [
-                if (state is CallConnected && state.session.isVideo &&
+                if (state is CallConnected &&
+                    state.session.isVideo &&
                     state.session.groupId != null)
                   Positioned.fill(
                     child: GridView.builder(
                       padding: const EdgeInsets.fromLTRB(8, 40, 8, 180),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.8,
-                        crossAxisSpacing: 8,
-                        mainAxisSpacing: 8,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.8,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
                       itemCount: state.remoteUids.length + 1,
                       itemBuilder: (context, index) => ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -85,7 +91,9 @@ class CallScreen extends StatelessWidget {
                             : AgoraVideoView(
                                 controller: VideoViewController.remote(
                                   rtcEngine: context.read<CallBloc>().engine!,
-                                  canvas: VideoCanvas(uid: state.remoteUids[index - 1]),
+                                  canvas: VideoCanvas(
+                                    uid: state.remoteUids[index - 1],
+                                  ),
                                   connection: RtcConnection(
                                     channelId: state.session.channelName,
                                     localUid: state.localUid,
@@ -130,7 +138,8 @@ class CallScreen extends StatelessWidget {
                       const SizedBox(height: 56),
                       // Avatar នៅបង្ហាញតែពេលមិនទាន់ connected ប៉ុណ្ណោះ
                       // (ពេល connected video ជំនួសរួចហើយ)
-                      if (state is! CallConnected || !state.session.isVideo) ...[
+                      if (state is! CallConnected ||
+                          !state.session.isVideo) ...[
                         CircleAvatar(
                           radius: 48,
                           backgroundColor: const Color(0xFF34C471),
@@ -162,7 +171,8 @@ class CallScreen extends StatelessWidget {
                           shadows: textShadow,
                         ),
                       ),
-                      if (state is CallConnected && state.session.groupId != null)
+                      if (state is CallConnected &&
+                          state.session.groupId != null)
                         Text(
                           '${state.remoteUids.length + 1} in call',
                           style: const TextStyle(color: Colors.white70),
@@ -260,4 +270,149 @@ class _RoundIconButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class CallHistoryScreen extends StatefulWidget {
+  const CallHistoryScreen({super.key});
+
+  @override
+  State<CallHistoryScreen> createState() => _CallHistoryScreenState();
+}
+
+class _CallHistoryScreenState extends State<CallHistoryScreen> {
+  late Future<List<_CallHistoryEntry>> _history = _loadHistory();
+
+  Future<List<_CallHistoryEntry>> _loadHistory() async {
+    final source = sl<MessageDataSource>();
+    final conversations = await source.getConversations();
+    final messagesByConversation = await Future.wait(
+      conversations.map(
+        (conversation) => source.getMessages(conversationId: conversation.id),
+      ),
+    );
+    final entries = <_CallHistoryEntry>[];
+    for (var i = 0; i < conversations.length; i++) {
+      for (final message in messagesByConversation[i]) {
+        if (message.isCallLog) {
+          entries.add(_CallHistoryEntry(conversations[i], message));
+        }
+      }
+    }
+    entries.sort((a, b) => b.message.createdAt.compareTo(a.message.createdAt));
+    return entries;
+  }
+
+  Future<void> _refresh() async {
+    final next = _loadHistory();
+    setState(() => _history = next);
+    try {
+      await next;
+    } catch (_) {
+      // The error state below gives the user a retry action.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Text(
+              'Calls',
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<_CallHistoryEntry>>(
+              future: _history,
+              builder: (context, snapshot) {
+                if (!snapshot.hasData && !snapshot.hasError) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: TextButton.icon(
+                      onPressed: _refresh,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Could not load calls. Retry'),
+                    ),
+                  );
+                }
+                final entries = snapshot.data!;
+                if (entries.isEmpty) {
+                  return const Center(child: Text('No calls yet'));
+                }
+                return RefreshIndicator(
+                  onRefresh: _refresh,
+                  child: ListView.builder(
+                    itemCount: entries.length,
+                    itemBuilder: (context, index) {
+                      final entry = entries[index];
+                      final missed =
+                          entry.message.callStatus == 'missed' ||
+                          entry.message.callStatus == 'declined';
+                      final name = entry.conversation.participantName;
+                      final date = entry.message.createdAt.toLocal();
+                      final localizations = MaterialLocalizations.of(context);
+                      final when =
+                          '${localizations.formatMediumDate(date)} · '
+                          '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(date))}';
+                      final label = missed
+                          ? (entry.conversation.isGroup
+                                ? 'Missed group call'
+                                : 'Missed call')
+                          : (entry.conversation.isGroup
+                                ? 'Group call'
+                                : 'Call');
+                      return ListTile(
+                        leading: CircleAvatar(
+                          child: Icon(
+                            entry.conversation.isGroup
+                                ? Icons.group_outlined
+                                : Icons.person_outline,
+                          ),
+                        ),
+                        title: Text(name),
+                        subtitle: Text(
+                          '$label · $when',
+                          style: missed
+                              ? const TextStyle(color: Color(0xFFE0433C))
+                              : null,
+                        ),
+                        trailing: Icon(
+                          entry.message.callType == 'video'
+                              ? Icons.videocam_outlined
+                              : Icons.call_outlined,
+                        ),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => ConversationScreen(
+                              conversationId: entry.conversation.id,
+                              participantId: entry.conversation.participantId,
+                              participantName: name,
+                              isGroup: entry.conversation.isGroup,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CallHistoryEntry {
+  const _CallHistoryEntry(this.conversation, this.message);
+
+  final ConversationSummary conversation;
+  final MessageModel message;
 }

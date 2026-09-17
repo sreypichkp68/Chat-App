@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "chat_app",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=AGORA_APP_ID=ebde1ac1d2214e898ef82f37813ff829"
+      ]
+    }
+  ]
+}
