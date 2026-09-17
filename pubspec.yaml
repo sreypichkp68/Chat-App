@@ -1,0 +1,61 @@
+name: chat_app
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  internet_connection_checker: ^3.0.1
+  get: ^4.7.3
+  flutter_bloc: ^9.1.1
+  flutter_secure_storage: ^9.2.2
+  get_it: ^9.2.1
+  web_socket_channel: ^3.0.3
+  google_fonts: ^8.2.1
+  image_picker: ^1.2.3
+  pusher_channels_flutter: ^2.4.0
+  pusher_reverb_flutter: ^0.0.10
+  agora_rtc_engine: ^6.5.4
+  permission_handler: ^13.0.1
+  flutter_local_notifications: ^22.3.0
+  flutter_callkit_incoming: ^3.1.5
+  flutter_dotenv: ^6.0.1
+  flutter_launcher_icons: ^0.14.4
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo/logo.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/logo/logo.png"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/logo/logo.png
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-VariableFont.ttf
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-VariableFont.ttf
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-VariableFont.ttf
+
+dependency_overrides:
+  permission_handler_android: 12.1.0
