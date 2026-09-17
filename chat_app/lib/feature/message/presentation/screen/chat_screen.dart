@@ -35,9 +35,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _hasConversationSnapshot = false;
 
   static const _green = Color(0xFF34C471);
-  static const _ink = Color(0xFF1B1D21);
   static const _inkFaint = Color(0xFF9AA0A6);
-  static const _chipBg = Color(0xFFF1F2F4);
 
   @override
   void initState() {
@@ -145,6 +143,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           before.participantId != after.participantId ||
           before.participantName != after.participantName ||
           before.isGroup != after.isGroup ||
+          before.isMissedCall != after.isMissedCall ||
           before.lastMessage != after.lastMessage ||
           before.lastMessageAt != after.lastMessageAt) {
         return false;
@@ -253,8 +252,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,12 +264,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Chats',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
-                      color: _ink,
+                      color: scheme.onSurface,
                     ),
                   ),
                   Row(
@@ -359,7 +359,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(fontSize: 15, color: _ink),
+                style: TextStyle(fontSize: 15, color: scheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'Search',
                   hintStyle: const TextStyle(color: _inkFaint, fontSize: 15),
@@ -385,7 +385,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         )
                       : null,
                   filled: true,
-                  fillColor: _chipBg,
+                  fillColor: scheme.surfaceContainerHigh,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -459,12 +459,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 ),
                                 title: Text(
                                   conversation.participantName,
-                                  style: const TextStyle(
-                                    color: _ink,
+                                  style: TextStyle(
+                                    color: scheme.onSurface,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                subtitle: Text(conversation.lastMessage),
+                                subtitle: Text(
+                                  conversation.lastMessage,
+                                  style: conversation.isMissedCall
+                                      ? const TextStyle(color: Color(0xFFE0433C))
+                                      : null,
+                                ),
                                 trailing: Text(
                                   _formatChatTime(conversation.lastMessageAt),
                                   style: const TextStyle(
@@ -529,6 +534,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -539,8 +545,8 @@ class _EmptyState extends StatelessWidget {
               width: 72,
               height: 72,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF1F2F4),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -550,12 +556,12 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No Contacts',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF1B1D21),
+                color: scheme.onSurface,
               ),
             ),
             const SizedBox(height: 6),

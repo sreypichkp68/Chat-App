@@ -214,16 +214,18 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = Theme.of(context).scaffoldBackgroundColor;
     return BlocProvider(
       create: (_) => _messageBloc,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: background,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.white,
+          backgroundColor: background,
+          surfaceTintColor: background,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF303238)),
+            icon: Icon(Icons.arrow_back, color: scheme.onSurface),
             onPressed: () => Navigator.of(context).pop(),
           ),
           titleSpacing: 0,
@@ -247,7 +249,6 @@ class _ConversationScreenState extends State<ConversationScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
                   CircleAvatar(
                     radius: 18,
@@ -265,12 +266,16 @@ class _ConversationScreenState extends State<ConversationScreen> {
                           ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    widget.participantName,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                  Expanded(
+                    child: Text(
+                      widget.participantName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
@@ -279,22 +284,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
           ),
           actions: [
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.call_outlined,
-                      color: Color(0xFF53565C),
+                      color: scheme.onSurfaceVariant,
                     ),
                     onPressed: () => _startCall(isVideo: false),
                   ),
                   IconButton(
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.videocam_outlined,
-                      color: Color(0xFF53565C),
+                      color: scheme.onSurfaceVariant,
                     ),
                     onPressed: () => _startCall(isVideo: true),
                   ),
                   const SizedBox(width: 6),
                   IconButton(
-                    icon: const Icon(Icons.more_vert, color: Color(0xFF53565C)),
+                    icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
                     onPressed: () {
                       if (widget.isGroup) {
                         Navigator.of(context).push(MaterialPageRoute(
@@ -466,22 +471,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ),
                     Row(
                       children: [
-                        const Icon(Icons.add, color: Color(0xFF565A60)),
+                        Icon(Icons.add, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 10),
                         GestureDetector(
                           onTap: _pickImage,
-                          child: const Icon(
+                          child: Icon(
                             Icons.photo,
-                            color: Color(0xFF565A60),
+                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Icon(
+                        Icon(
                           Icons.camera_alt_rounded,
-                          color: Color(0xFF565A60),
+                          color: scheme.onSurfaceVariant,
                         ),
                         const SizedBox(width: 10),
-                        const Icon(Icons.mic_none, color: Color(0xFF565A60)),
+                        Icon(Icons.mic_none, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
@@ -493,7 +498,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                   ? 'Add a caption'
                                   : 'Message',
                               filled: true,
-                              fillColor: const Color(0xFFF4F5F6),
+                              fillColor: scheme.surfaceContainerHigh,
                               suffixIcon: const Icon(
                                 Icons.emoji_emotions_outlined,
                               ),
@@ -552,10 +557,11 @@ class _MessageBubble extends StatelessWidget {
       );
     }
 
+    final scheme = Theme.of(context).colorScheme;
     final bubbleColor = sentByMe
         ? const Color(0xFF21B95F)
-        : const Color(0xFFF1F2F4);
-    final textColor = sentByMe ? Colors.white : const Color(0xFF4A4D53);
+        : scheme.surfaceContainerHigh;
+    final textColor = sentByMe ? Colors.white : scheme.onSurface;
     final hasImage =
         (message.imageUrl?.isNotEmpty ?? false) ||
         (message.localImagePath?.isNotEmpty ?? false);
@@ -574,8 +580,8 @@ class _MessageBubble extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 5),
                 child: Text(
                   senderName!,
-                  style: const TextStyle(
-                    color: Color(0xFF4A4D53),
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -642,9 +648,7 @@ class _MessageBubble extends StatelessWidget {
                         child: Text(
                           message.displayContent,
                           style: TextStyle(
-                            color: hasImage
-                                ? const Color(0xFF4A4D53)
-                                : textColor,
+                            color: hasImage ? scheme.onSurface : textColor,
                             fontSize: 15,
                             height: 1.25,
                           ),
@@ -687,6 +691,7 @@ class _CallLogBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final status = message.callStatus ?? 'ended';
     final isGroupCall = message.isGroupCallLog;
     final isVideo = message.callType == 'video';
@@ -706,11 +711,11 @@ class _CallLogBubble extends StatelessWidget {
             : 'Missed ${isGroupCall ? 'group ' : ''}${isVideo ? 'video ' : ''}call';
         break;
       case 'declined':
-        icon = Icons.call_end_rounded;
+        icon = Icons.call_missed_rounded;
         iconColor = const Color(0xFFE0433C);
         label = isGroupCall
-            ? 'Group call declined'
-            : sentByMe ? 'Call declined' : 'You declined';
+            ? 'Missed group call'
+            : 'Missed call';
         break;
       case 'ended':
       default:
@@ -735,7 +740,7 @@ class _CallLogBubble extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F2F4),
+                color: scheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Row(
@@ -745,9 +750,11 @@ class _CallLogBubble extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     label,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF4A4D53),
+                      color: status == 'missed' || status == 'declined'
+                          ? iconColor
+                          : scheme.onSurface,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -794,11 +801,12 @@ class _MessageActionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 18),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
         boxShadow: const [
           BoxShadow(
@@ -817,15 +825,15 @@ class _MessageActionSheet extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F6),
+                color: scheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 message.content,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF303238),
+                style: TextStyle(
+                  color: scheme.onSurface,
                   fontSize: 13,
                   height: 1.3,
                 ),
@@ -925,6 +933,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurface;
     return Column(
       children: [
         InkWell(
@@ -936,14 +945,14 @@ class _ActionRow extends StatelessWidget {
                 Expanded(
                   child: Text(
                     label,
-                    style: const TextStyle(
-                      color: Color(0xFF292B30),
+                    style: TextStyle(
+                      color: color,
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                Icon(icon, size: 23, color: const Color(0xFF292B30)),
+                Icon(icon, size: 23, color: color),
               ],
             ),
           ),

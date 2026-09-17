@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/notification_service.dart';
+import 'package:chat_app/core/theme/theme_controller.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_bloc.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/register_bloc.dart';
 import 'package:chat_app/feature/auth/presentation/screen/auth_gate.dart';
@@ -15,6 +16,7 @@ void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      await ThemeController.initialize();
       //when use server docker need it
       await dotenv.load(fileName: ".env");
       await NotificationService.instance.initialize();
@@ -44,12 +46,24 @@ class MyApp extends StatelessWidget {
         // CallBloc is intentionally NOT provided here — it doesn't exist
         // until after login. See AuthGate's _AuthenticatedShell.
       ],
-      child: GetMaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      child: ValueListenableBuilder<ThemeMode>(
+        valueListenable: ThemeController.mode,
+        builder: (context, mode, _) => GetMaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.deepPurple,
+              brightness: Brightness.dark,
+            ),
+          ),
+          themeMode: mode,
+          home: const AuthGate(),
         ),
-        home: const AuthGate(),
       ),
     );
   }

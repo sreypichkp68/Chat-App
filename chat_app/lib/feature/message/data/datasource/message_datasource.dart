@@ -29,6 +29,7 @@ class ConversationSummary {
   final String lastMessage;
   final DateTime? lastMessageAt;
   final String? lastMessageSenderId;
+  final bool isMissedCall;
 
   const ConversationSummary({
     required this.id,
@@ -38,6 +39,7 @@ class ConversationSummary {
     required this.lastMessage,
     required this.lastMessageAt,
     required this.lastMessageSenderId,
+    required this.isMissedCall,
   });
 
   factory ConversationSummary.fromJson(
@@ -68,6 +70,7 @@ class ConversationSummary {
     final lastMessageContent = lastMessage['content'] as String?;
 
     String previewText;
+    var isMissedCall = false;
     if (lastMessageType == 'image') {
       previewText = '📷 Photo';
     } else if (lastMessageType == 'audio') {
@@ -85,17 +88,16 @@ class ConversationSummary {
         meta = Map<String, dynamic>.from(rawMeta);
       }
       final status = meta['status'] as String?;
+      isMissedCall = status == 'missed' || status == 'declined';
       final duration = meta['duration_seconds'] as int?;
       if (meta['group_id'] != null) {
-        previewText = status == 'missed'
+        previewText = status == 'missed' || status == 'declined'
             ? 'Missed group call'
             : duration != null && duration > 0
             ? 'Group call · ${duration ~/ 60}:${(duration % 60).toString().padLeft(2, '0')}'
             : 'Group call ended';
-      } else if (status == 'missed') {
+      } else if (status == 'missed' || status == 'declined') {
         previewText = 'Missed call';
-      } else if (status == 'declined') {
-        previewText = 'Declined call';
       } else if (status == 'no_answer') {
         previewText = 'No answer';
       } else if (duration != null && duration > 0) {
@@ -134,6 +136,7 @@ class ConversationSummary {
       lastMessage: previewText,
       lastMessageAt: createdAt is String ? DateTime.tryParse(createdAt) : null,
       lastMessageSenderId: lastMessage['sender_id']?.toString(),
+      isMissedCall: isMissedCall,
     );
   }
 

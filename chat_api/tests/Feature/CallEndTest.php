@@ -2,7 +2,11 @@
 namespace Tests\Feature;
 
 use App\Events\CallEnded;
+use App\Events\CallDeclined;
+use App\Events\MessageSent;
 use App\Models\Call;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
 use App\Models\User;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +74,34 @@ class CallEndTest extends TestCase
         $this->actingAs(User::factory()->create(), 'sanctum')
             ->getJson('/api/calls/'.$call->call_id)->assertForbidden();
     }
+
+    public function test_decline_records_one_call_log_even_if_end_arrives_later(): void
+    {
+        Event::fake([CallEnded::class, CallDeclined::class, MessageSent::class]);
+        [$caller, $callee, $call] = $this->makeCall();
+        $conversation = Conversation::create(['type' => 'direct', 'created_by' => $caller->id]);
+        foreach ([$caller, $callee] as $user) {
+            ConversationMember::create([
+                'conversation_id' => $conversation->id,
+                'user_id' => $user->id,
+                'role' => 'member',
+            ]);
+        }
+
+        $this->actingAs($callee, 'sanctum')->postJson('/api/calls/decline', [
+            'callId' => $call->call_id,
+            'peerId' => $caller->id,
+        ])->assertOk();
+        $this->actingAs($callee, 'sanctum')->postJson('/api/calls/'.$call->call_id.'/end', [
+            'status' => 'declined',
+        ])->assertOk();
+
+        $logs = $conversation->messages()->where('message_type', 'call_log')->get();
+        $this->assertCount(1, $logs);
+        $this->assertSame('declined', $logs->first()->metadata['status']);
+        Event::assertDispatchedTimes(MessageSent::class, 1);
+    }
+
     private function makeCall(): array
     {
         $caller = User::factory()->create();
@@ -82,4 +114,3 @@ class CallEndTest extends TestCase
         return [$caller, $callee, $call];
     }
 }
-

@@ -1,5 +1,6 @@
 import 'package:chat_app/feature/message/presentation/screen/chat_screen.dart';
-import 'package:chat_app/feature/auth/presentation/screen/settings_screen.dart';
+import 'package:chat_app/feature/profile/presentation/screen/settings_screen.dart';
+import 'package:chat_app/feature/group/presentation/screen/group_screen.dart';
 import 'package:flutter/material.dart';
 
 class MainScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class _MainScreenState extends State<MainScreen> {
   final List screen = [
     ChatScreen(),
     Center(child: Text("Phone")),
-    Center(child: Text("Group")),
+    const GroupScreen(),
     const SettingsScreen(),
   ];
   int indexPage = 0;
@@ -33,7 +34,7 @@ class _MainScreenState extends State<MainScreen> {
         items: [
           BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Char"),
           BottomNavigationBarItem(icon: Icon(Icons.phone), label: "Call"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Group"),
+          BottomNavigationBarItem(icon: Icon(Icons.group_outlined), label: "Group"),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Setting"),
         ],
       ),

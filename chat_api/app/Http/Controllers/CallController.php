@@ -95,13 +95,17 @@ class CallController extends Controller
             'peerId' => 'required|integer',
         ]);
 
-        $call = Call::where('call_id', $data['callId'])->firstOrFail();
-        abort_unless((int) $call->callee_id === (int) $request->user()->id, 403);
-        abort_unless((int) $data['peerId'] === (int) $call->caller_id, 403);
-        $call->update([
-            'status' => 'declined',
-            'ended_at' => now(),
-        ]);
+        DB::transaction(function () use ($data, $request) {
+            $call = Call::where('call_id', $data['callId'])->lockForUpdate()->firstOrFail();
+            abort_unless((int) $call->callee_id === (int) $request->user()->id, 403);
+            abort_unless((int) $data['peerId'] === (int) $call->caller_id, 403);
+            if ($call->ended_at === null) {
+                $call->update(['status' => 'declined', 'ended_at' => now()]);
+            }
+            if ($call->group_id === null) {
+                $this->recordDirectCallHistory($call);
+            }
+        });
 
         // This is already sent only to the caller's private channel.
         broadcast(new CallDeclined($data['callId'], (string) $data['peerId']));
@@ -154,50 +158,50 @@ class CallController extends Controller
             return response()->json(['call' => $call, 'message' => $message]);
         }
 
-        if ($call->ended_at !== null) {
-            $existingMessage = Conversation::betweenUsers($call->caller_id, $call->callee_id)
-                ?->messages()
-                ->where('message_type', 'call_log')
-                ->whereJsonContains('metadata->call_id', $call->call_id)
-                ->latest()
-                ->first();
-
-            return response()->json(['call' => $call, 'message' => $existingMessage]);
+        if ($call->ended_at === null) {
+            $call->update(['status' => $data['status'], 'ended_at' => now()]);
         }
-
-        $call->update([
-            'status' => $data['status'],
-            'ended_at' => now(),
-        ]);
-
-        $duration = ($call->started_at && $call->ended_at)
-            ? $call->ended_at->diffInSeconds($call->started_at)
-            : null;
-
-        $conversation = $call->group_id === null
-            ? Conversation::betweenUsers($call->caller_id, $call->callee_id)
-            : null;
-        $message = null;
-
-        if ($conversation) {
-            $message = $conversation->messages()->create([
-                'sender_id' => $call->caller_id,
-                'message_type' => 'call_log',
-                'metadata' => [
-                    'call_id' => $call->call_id,
-                    'call_type' => $call->type,
-                    'status' => $call->status,
-                    'duration_seconds' => $duration,
-                    'caller_id' => $call->caller_id,
-                ],
-            ]);
-
-            broadcast(new MessageSent($message))->toOthers();
-        }
+        $message = $this->recordDirectCallHistory($call);
 
         return response()->json(['call' => $call, 'message' => $message]);
     });
 }
+
+    private function recordDirectCallHistory(Call $call): ?\App\Models\Message
+    {
+        $conversation = Conversation::betweenUsers($call->caller_id, $call->callee_id);
+        if (! $conversation) {
+            return null;
+        }
+
+        $existing = $conversation->messages()
+            ->where('message_type', 'call_log')
+            ->whereJsonContains('metadata->call_id', $call->call_id)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        $duration = ($call->started_at && $call->ended_at)
+            ? $call->ended_at->diffInSeconds($call->started_at)
+            : null;
+        $message = $conversation->messages()->create([
+            'sender_id' => $call->caller_id,
+            'message_type' => 'call_log',
+            'metadata' => [
+                'call_id' => $call->call_id,
+                'call_type' => $call->type,
+                'status' => $call->status,
+                'duration_seconds' => $duration,
+                'caller_id' => $call->caller_id,
+            ],
+        ]);
+        DB::afterCommit(function () use ($message) {
+            broadcast(new MessageSent($message));
+        });
+
+        return $message;
+    }
 
     private function recordGroupCallHistory(Conversation $group, Call $call): ?\App\Models\Message
     {

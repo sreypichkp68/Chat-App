@@ -43,6 +43,7 @@ class _UserSearchTileState extends State<UserSearchTile> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return ListTile(
       onTap: widget.onTap,
       contentPadding: EdgeInsets.zero,
@@ -62,10 +63,10 @@ class _UserSearchTileState extends State<UserSearchTile> {
       ),
       title: Text(
         widget.user.name,
-        style: ChatType.contactName.copyWith(fontSize: 15),
+        style: ChatType.contactName.copyWith(fontSize: 15, color: scheme.onSurface),
       ),
       subtitle: widget.user.statusMessage != null
-          ? Text(widget.user.statusMessage!, style: ChatType.timestamp)
+          ? Text(widget.user.statusMessage!, style: ChatType.timestamp.copyWith(color: scheme.onSurfaceVariant))
           : null,
       trailing: widget.onAddFriend == null
           ? null

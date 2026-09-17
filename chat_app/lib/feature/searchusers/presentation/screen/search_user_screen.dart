@@ -13,10 +13,12 @@ class SearchUserScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final background = Theme.of(context).scaffoldBackgroundColor;
     return Scaffold(
-      backgroundColor: ChatColors.paper,
+      backgroundColor: background,
       appBar: AppBar(
-        backgroundColor: ChatColors.paper,
+        backgroundColor: background,
         elevation: 0,
         title: const Text('New Chat'),
       ),
@@ -27,13 +29,13 @@ class SearchUserScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: TextField(
                 autofocus: true,
-                style: ChatType.body,
+                style: ChatType.body.copyWith(color: scheme.onSurface),
                 decoration: InputDecoration(
                   hintText: 'Search by name or email',
-                  hintStyle: ChatType.body.copyWith(color: ChatColors.inkFaint),
-                  prefixIcon: const Icon(Icons.search, color: ChatColors.inkFaint),
+                  hintStyle: ChatType.body.copyWith(color: scheme.onSurfaceVariant),
+                  prefixIcon: Icon(Icons.search, color: scheme.onSurfaceVariant),
                   filled: true,
-                  fillColor: ChatColors.clay.withValues(alpha: 0.3),
+                  fillColor: scheme.surfaceContainerHigh,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
