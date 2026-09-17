@@ -10,6 +10,9 @@ set -e
 php artisan config:clear
 php artisan cache:clear
 
+# Apply database changes before the API accepts requests.
+php artisan migrate --force
+
 # 2. Start Laravel HTTP API internally on port 8000
 php artisan serve --host=0.0.0.0 --port=8000 &
 

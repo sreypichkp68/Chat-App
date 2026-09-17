@@ -314,6 +314,7 @@ class CallBloc extends Bloc<CallEvent, CallState> {
           autoSubscribeAudio: true,
         ),
       );
+      final inviteErrors = <String>[];
       final results = await Future.wait(members.toList().asMap().entries.map((entry) async {
         try {
           await _signaling.sendInvite(CallInvitePayload(
@@ -336,11 +337,14 @@ class CallBloc extends Bloc<CallEvent, CallState> {
           return true;
         } catch (error) {
           log('Could not invite group member ${entry.value}: $error');
+          inviteErrors.add(error.toString());
           return false;
         }
       }));
       if (results.every((sent) => !sent)) {
-        throw StateError('Could not invite any group members.');
+        throw StateError(inviteErrors.isEmpty
+            ? 'Could not invite any group members.'
+            : inviteErrors.first);
       }
     } catch (error) {
       _sentGroupInvites.remove(callId);
