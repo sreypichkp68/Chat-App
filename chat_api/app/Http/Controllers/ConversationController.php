@@ -19,42 +19,9 @@ class ConversationController extends Controller
     ->with(['lastMessage', 'members.user:id,name,avatar_url'])
     ->get();
 
-    $conversations->each(function ($conversation) use ($user) {
-        $lastMessage = $conversation->lastMessage;
-        $lastCall = $conversation->type === 'direct' ? $conversation->lastCall() : null;
-
-        $lastMessageAt = $lastMessage?->created_at;
-        $lastCallAt = $lastCall?->started_at;
-
-        // Call is more recent than the last text message → show call as preview
-        if ($lastCall && (!$lastMessage || $lastCallAt->gt($lastMessageAt))) {
-            $conversation->unsetRelation('lastMessage');
-            $conversation->setAttribute('last_message', [
-                'message_type' => 'call',
-                'content' => $this->formatCallPreview($lastCall, $user->id),
-                'created_at' => $lastCall->started_at,
-                'sender_id' => $lastCall->caller_id,
-            ]);
-        }
-    });
-
     return response()->json($conversations);
 }
 
-private function formatCallPreview($call, int $currentUserId): string
-{
-    if (in_array($call->status, ['missed', 'no_answer'])) {
-        return $call->status === 'missed' ? 'Missed call' : 'No answer';
-    }
-    if ($call->status === 'declined') {
-        return 'Declined call';
-    }
-    if ($call->ended_at && $call->started_at) {
-        $seconds = $call->ended_at->diffInSeconds($call->started_at);
-        return sprintf('Call · %d:%02d', intdiv($seconds, 60), $seconds % 60);
-    }
-    return 'Call';
-}
     public function store(Request $request)
     {
         $request->validate([
