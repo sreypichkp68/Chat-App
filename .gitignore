@@ -48,3 +48,19 @@ app.*.map.json
 android/key.properties
 
 *.jks
+
+chat_app/build/
+
+chat_app/android/key.properties
+
+*.jks
+
+chat_app/build/
+
+chat_app/.dart_tool/
+
+chat_app_old/
+
+chat_api_old/
+
+chat_app_backup/
