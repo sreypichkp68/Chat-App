@@ -6,6 +6,7 @@ import 'package:chat_app/feature/message/data/model/message_model.dart';
 import 'package:http/http.dart' as http;
 
 abstract class MessageDataSource {
+  Future<void> deleteMessage(int messageId);
   Future<List<ConversationSummary>> getConversations();
   Future<void> removeConversation({required int conversationId});
 
@@ -201,6 +202,17 @@ class ConversationSummary {
 }
 
 class MessageDataSourceImpl implements MessageDataSource {
+  @override
+  Future<void> deleteMessage(int messageId) async {
+    final response = await client.delete(
+      Uri.parse('${ApiEntpoint.url}/messages/$messageId'),
+      headers: await _headers(),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Could not delete message: ${response.body}');
+    }
+  }
+
   final http.Client client;
   final TokenStorage tokenStorage;
 

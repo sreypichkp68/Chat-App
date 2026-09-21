@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
 import 'package:chat_app/feature/group/domain/entity/group_entity.dart';
 import 'package:chat_app/core/widget/profile_avatar_image.dart';
 
@@ -20,6 +21,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get/get.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ConversationScreen extends StatefulWidget {
   final int conversationId;
@@ -154,14 +156,53 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   File? _pendingImage;
+  bool _pickingImage = false;
 
-  Future<void> _pickImage() async {
-    final XFile? picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 80,
-    );
-    if (picked == null) return;
-    setState(() => _pendingImage = File(picked.path));
+  Future<void> _pickImage({ImageSource source = ImageSource.gallery}) async {
+    if (_pickingImage) return;
+    setState(() => _pickingImage = true);
+    try {
+      // Android requires permission because CAMERA is declared for video calls.
+      if (source == ImageSource.camera && Platform.isAndroid) {
+        final permission = await Permission.camera.request();
+        if (!mounted) return;
+        if (!permission.isGranted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Allow camera access to take a photo.'),
+              action: permission.isPermanentlyDenied
+                  ? SnackBarAction(
+                      label: 'Settings',
+                      onPressed: () {
+                        openAppSettings();
+                      },
+                    )
+                  : null,
+            ),
+          );
+          return;
+        }
+      }
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+      if (picked == null || !mounted) return;
+      setState(() => _pendingImage = File(picked.path));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? 'Could not open the camera. Check camera access and try again.'
+                : 'Could not open the photo library. Please try again.',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _pickingImage = false);
+    }
   }
 
   void _removePendingImage() {
@@ -252,16 +293,50 @@ class _ConversationScreenState extends State<ConversationScreen> {
             const SnackBar(content: Text('Forwarding will be available soon.')),
           );
         },
-        onDelete: () {
-          Navigator.of(sheetContext).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Message deletion will be available soon.'),
-            ),
-          );
-        },
+        onDelete:
+            message.id > 0 && message.senderId.toString() == _currentUserId
+            ? () {
+                Navigator.of(sheetContext).pop();
+                _deleteMessage(message);
+              }
+            : null,
       ),
     );
+  }
+
+  Future<void> _deleteMessage(MessageEntity message) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete message?'),
+        content: const Text(
+          'This permanently deletes your message for everyone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await sl<MessageDataSource>().deleteMessage(message.id);
+      if (!mounted) return;
+      _messageBloc.add(
+        MessageLoadRequested(conversationId: widget.conversationId),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
+    }
   }
 
   void _scrollToLatest({required bool jump}) {
@@ -550,16 +625,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
                         Icon(Icons.add, color: scheme.onSurfaceVariant),
                         const SizedBox(width: 10),
                         GestureDetector(
-                          onTap: _pickImage,
+                          onTap: _pickingImage ? null : () => _pickImage(),
                           child: Icon(
                             Icons.photo,
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Icon(
-                          Icons.camera_alt_rounded,
-                          color: scheme.onSurfaceVariant,
+                        IconButton(
+                          tooltip: 'Take photo',
+                          onPressed: _pickingImage
+                              ? null
+                              : () => _pickImage(source: ImageSource.camera),
+                          icon: Icon(
+                            Icons.camera_alt_rounded,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         Icon(Icons.mic_none, color: scheme.onSurfaceVariant),
@@ -871,7 +952,7 @@ class _MessageActionSheet extends StatelessWidget {
   final VoidCallback onCopy;
   final VoidCallback onReplay;
   final VoidCallback onForward;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -948,12 +1029,13 @@ class _MessageActionSheet extends StatelessWidget {
               icon: Icons.forward_rounded,
               onTap: onForward,
             ),
-            _ActionRow(
-              label: 'Delete',
-              icon: Icons.delete_outline_rounded,
-              onTap: onDelete,
-              isLast: true,
-            ),
+            if (onDelete != null)
+              _ActionRow(
+                label: 'Delete',
+                icon: Icons.delete_outline_rounded,
+                onTap: onDelete!,
+                isLast: true,
+              ),
           ],
         ),
       ),

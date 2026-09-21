@@ -125,6 +125,7 @@ class MessageBloc extends Bloc<MessageEvent, MessageState> {
     Emitter<MessageState> emit,
   ) async {
     try {
+      final idsBeforeRefresh = _messages.map((message) => message.id).toSet();
       final latest = await getMessagesUsecase.call(
         conversationId: event.conversationId,
       );
@@ -132,7 +133,29 @@ class MessageBloc extends Bloc<MessageEvent, MessageState> {
       final newMessages = latest
           .where((message) => !existingIds.contains(message.id))
           .toList();
-      if (newMessages.isEmpty) return;
+      // Refresh the loaded page so server deletions disappear for recipients too.
+      final latestIds = latest.map((message) => message.id).toSet();
+      final beforeCount = _messages.length;
+      if (latest.length < 50) {
+        _messages.removeWhere(
+          (message) =>
+              message.id > 0 &&
+              idsBeforeRefresh.contains(message.id) &&
+              !latestIds.contains(message.id),
+        );
+      } else {
+        final oldest = latest
+            .map((message) => message.createdAt)
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+        _messages.removeWhere(
+          (message) =>
+              message.id > 0 &&
+              idsBeforeRefresh.contains(message.id) &&
+              !message.createdAt.isBefore(oldest) &&
+              !latestIds.contains(message.id),
+        );
+      }
+      if (newMessages.isEmpty && beforeCount == _messages.length) return;
 
       _messages.addAll(newMessages);
       _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));

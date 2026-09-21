@@ -68,6 +68,12 @@ class GroupMembersTest extends TestCase
         ]);
         $this->assertDatabaseHas('users', ['id' => $newMember->id]);
         $this->assertDatabaseHas('messages', ['id' => $message->id]);
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson('/api/messages/'.$message->id)->assertForbidden();
+        $this->assertDatabaseHas('messages', ['id' => $message->id]);
+        $this->actingAs($newMember, 'sanctum')
+            ->deleteJson('/api/messages/'.$message->id)->assertOk();
+        $this->assertDatabaseMissing('messages', ['id' => $message->id]);
         $this->actingAs($newMember, 'sanctum')
             ->getJson('/api/groups/'.$group->id)->assertForbidden();
     }
