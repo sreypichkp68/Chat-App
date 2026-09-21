@@ -68,6 +68,9 @@ class MessageController extends Controller
         }
 
         $request->validate(['content' => 'required|string']);
+        if (!empty($message->metadata['is_unsent'])) {
+            return response()->json(['message' => 'An unsent message cannot be edited.'], 409);
+        }
 
         $message->content = $request->input('content');
         $metadata = $message->metadata ?? [];
@@ -90,7 +93,11 @@ class MessageController extends Controller
             Storage::disk('public')->delete(str_replace('/storage/', '', $message->metadata['file_url']));
         }
 
-        $message->delete();
+        $message->content = 'Unsend Message';
+        $message->message_type = 'text';
+        $message->metadata = ['is_unsent' => true];
+        $message->reply_to_message_id = null;
+        $message->save();
 
         return response()->json(['message' => 'Message deleted successfully']);
     }

@@ -155,7 +155,22 @@ class MessageBloc extends Bloc<MessageEvent, MessageState> {
               !latestIds.contains(message.id),
         );
       }
-      if (newMessages.isEmpty && beforeCount == _messages.length) return;
+      var changed = false;
+      final latestById = {for (final message in latest) message.id: message};
+      for (var i = 0; i < _messages.length; i++) {
+        final updated = latestById[_messages[i].id];
+        if (updated != null &&
+            (updated.updatedAt != _messages[i].updatedAt ||
+                updated.content != _messages[i].content ||
+                updated.metadata?['is_unsent'] !=
+                    _messages[i].metadata?['is_unsent'] ||
+                updated.messageType != _messages[i].messageType)) {
+          _messages[i] = updated;
+          changed = true;
+        }
+      }
+      if (!changed && newMessages.isEmpty && beforeCount == _messages.length)
+        return;
 
       _messages.addAll(newMessages);
       _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));

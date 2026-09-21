@@ -269,6 +269,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
   }
 
   Future<void> _showMessageActions(MessageEntity message) async {
+    if (message.metadata?['is_unsent'] == true) return;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -310,7 +311,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Delete message?'),
         content: const Text(
-          'This permanently deletes your message for everyone.',
+          'Your message will be replaced with "Unsend Message" for everyone.',
         ),
         actions: [
           TextButton(

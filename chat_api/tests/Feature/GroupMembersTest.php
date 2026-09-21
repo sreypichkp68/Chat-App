@@ -73,7 +73,10 @@ class GroupMembersTest extends TestCase
         $this->assertDatabaseHas('messages', ['id' => $message->id]);
         $this->actingAs($newMember, 'sanctum')
             ->deleteJson('/api/messages/'.$message->id)->assertOk();
-        $this->assertDatabaseMissing('messages', ['id' => $message->id]);
+        $this->assertDatabaseHas('messages', ['id' => $message->id, 'content' => 'Unsend Message', 'message_type' => 'text']);
+        $message->refresh();
+        $this->assertSame(['is_unsent' => true], $message->metadata);
+        $this->assertNull($message->reply_to_message_id);
         $this->actingAs($newMember, 'sanctum')
             ->getJson('/api/groups/'.$group->id)->assertForbidden();
     }
