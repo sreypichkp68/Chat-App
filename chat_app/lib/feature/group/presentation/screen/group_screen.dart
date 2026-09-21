@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:chat_app/feature/message/presentation/widget/conversation_avatar.dart';
 
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/feature/group/presentation/bloc/group_bloc.dart';
@@ -90,6 +91,7 @@ class _GroupScreenState extends State<GroupScreen> with WidgetsBindingObserver {
           conversationId: group.id,
           participantId: group.participantId,
           participantName: group.participantName,
+          avatarUrl: group.avatarUrl,
           isGroup: true,
         ),
       ),
@@ -160,10 +162,7 @@ class _GroupScreenState extends State<GroupScreen> with WidgetsBindingObserver {
                       itemBuilder: (context, index) {
                         final group = _groups[index];
                         return ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Color(0xFF34C471),
-                            child: Icon(Icons.group, color: Colors.white),
-                          ),
+                          leading: ConversationAvatar(conversation: group),
                           title: Text(
                             group.participantName,
                             maxLines: 1,

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:chat_app/feature/message/presentation/widget/conversation_avatar.dart';
 
 import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user.state.dart';
@@ -171,6 +173,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (before.id != after.id ||
           before.participantId != after.participantId ||
           before.participantName != after.participantName ||
+          before.avatarUrl != after.avatarUrl ||
+          !listEquals(before.memberAvatars, after.memberAvatars) ||
           before.isGroup != after.isGroup ||
           before.isMissedCall != after.isMissedCall ||
           before.lastMessage != after.lastMessage ||
@@ -190,7 +194,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return '$hour:$minute $period';
   }
 
-  Future<void> _openConversation(FriendContact friend) async {
+  Future<void> _openConversation(
+    FriendContact friend, {
+    String? avatarUrl,
+  }) async {
     try {
       final conversationId = await sl<OpenDirectConversationUsecase>().call(
         participantId: friend.id,
@@ -200,6 +207,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         conversationId: conversationId,
         participantId: friend.id,
         participantName: friend.name,
+        avatarUrl: avatarUrl,
       );
     } catch (error) {
       if (!mounted) return;
@@ -262,6 +270,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     required int conversationId,
     required String participantId,
     required String participantName,
+    String? avatarUrl,
     bool isGroup = false,
   }) async {
     await Navigator.of(context).push(
@@ -270,6 +279,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           conversationId: conversationId,
           participantId: participantId,
           participantName: participantName,
+          avatarUrl: avatarUrl,
           isGroup: isGroup,
         ),
       ),
@@ -517,17 +527,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                   ),
                                   child: ListTile(
                                     contentPadding: EdgeInsets.zero,
-                                    leading: CircleAvatar(
-                                      backgroundColor: _green,
-                                      child: Text(
-                                        conversation.participantName.isEmpty
-                                            ? '?'
-                                            : conversation.participantName[0]
-                                                  .toUpperCase(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
+                                    leading: ConversationAvatar(
+                                      conversation: conversation,
                                     ),
                                     title: Text(
                                       conversation.participantName,
@@ -559,6 +560,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                       participantName:
                                           conversation.participantName,
                                       isGroup: conversation.isGroup,
+                                      avatarUrl: conversation.avatarUrl,
                                     ),
                                   ),
                                 ),
@@ -596,6 +598,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               name: user.name,
                               email: '',
                             ),
+                            avatarUrl: user.avatarUrl,
                           );
                         },
                         onAddFriend: () => sl<FriendRequestRemoteDatasource>()

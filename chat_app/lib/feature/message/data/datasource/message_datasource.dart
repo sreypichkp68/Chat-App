@@ -26,6 +26,8 @@ class ConversationSummary {
   final int id;
   final String participantId;
   final String participantName;
+  final String? avatarUrl;
+  final List<({String name, String? avatarUrl})> memberAvatars;
   final bool isGroup;
   final String lastMessage;
   final DateTime? lastMessageAt;
@@ -36,6 +38,8 @@ class ConversationSummary {
     required this.id,
     required this.participantId,
     required this.participantName,
+    this.avatarUrl,
+    this.memberAvatars = const [],
     required this.isGroup,
     required this.lastMessage,
     required this.lastMessageAt,
@@ -135,6 +139,22 @@ class ConversationSummary {
           : 'Unknown user',
       isGroup: isGroup,
       lastMessage: previewText,
+      memberAvatars: isGroup
+          ? (json['members'] as List? ?? const [])
+                .whereType<Map>()
+                .where((member) => member['user'] is Map)
+                .map((member) {
+                  final user = member['user'] as Map;
+                  return (
+                    name: user['name']?.toString() ?? '',
+                    avatarUrl: user['avatar_url'] as String?,
+                  );
+                })
+                .take(2)
+                .toList()
+          : const [],
+      avatarUrl:
+          (isGroup ? json['avatar_url'] : participant['avatar_url']) as String?,
       lastMessageAt: createdAt is String ? DateTime.tryParse(createdAt) : null,
       lastMessageSenderId: lastMessage['sender_id']?.toString(),
       isMissedCall: isMissedCall,

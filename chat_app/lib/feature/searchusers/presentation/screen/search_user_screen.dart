@@ -95,6 +95,7 @@ class SearchUserScreen extends StatelessWidget {
                                           conversationId: id,
                                           participantId: user.id,
                                           participantName: user.name,
+                                          avatarUrl: user.avatarUrl,
                                         ),
                                       ),
                                     );

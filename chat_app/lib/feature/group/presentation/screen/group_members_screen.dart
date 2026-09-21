@@ -4,6 +4,7 @@ import 'package:chat_app/feature/friends/data/datasource/friend_request_remote_d
 import 'package:chat_app/feature/group/data/datasource/group_remote_data_source.dart';
 import 'package:chat_app/feature/group/data/model/group_model.dart';
 import 'package:flutter/material.dart';
+import 'package:chat_app/core/widget/profile_avatar_image.dart';
 
 class GroupMembersScreen extends StatefulWidget {
   final int groupId;
@@ -23,6 +24,63 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   final Set<int> _selectedIds = {};
   bool _loading = true;
   bool _adding = false;
+  int? _removingId;
+
+  Future<void> _removeMember(int userId, String name) async {
+    if (_removingId != null || _adding) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove member?'),
+        content: Text(
+          'Remove $name from this group? Their account and existing messages will be kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _removingId = userId);
+    try {
+      await sl<GroupRemoteDataSource>().removeMember(
+        groupId: widget.groupId,
+        userId: userId,
+      );
+      if (!mounted) return;
+      final group = _group!;
+      setState(() {
+        _group = GroupModel(
+          id: group.id,
+          type: group.type,
+          title: group.title,
+          avatarUrl: group.avatarUrl,
+          createdBy: group.createdBy,
+          members: group.members
+              .where((member) => member.id != userId)
+              .toList(),
+        );
+        _selectedIds.remove(userId);
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$name removed from the group.')));
+    } catch (error) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _removingId = null);
+    }
+  }
 
   @override
   void initState() {
@@ -58,7 +116,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
   }
 
   Future<void> _addMembers() async {
-    if (_adding || _selectedIds.isEmpty) return;
+    if (_adding || _removingId != null || _selectedIds.isEmpty) return;
     setState(() => _adding = true);
     try {
       final group = await sl<GroupRemoteDataSource>().addMembers(
@@ -103,7 +161,18 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Group members')),
+      appBar: AppBar(
+        title: const Text('Group members'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh profiles',
+            onPressed: _loading || _adding || _removingId != null
+                ? null
+                : _load,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -127,6 +196,11 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 ...group.members.map(
                   (member) => ListTile(
                     leading: CircleAvatar(
+                      foregroundImage: profileAvatarImage(member.avatarUrl),
+                      onForegroundImageError:
+                          profileAvatarImage(member.avatarUrl) == null
+                          ? null
+                          : (_, error) {},
                       child: Text(
                         member.name.isEmpty
                             ? '?'
@@ -134,7 +208,35 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                       ),
                     ),
                     title: Text(member.name),
-                    trailing: member.role == 'admin'
+                    trailing: isAdmin && member.id.toString() != _currentUserId
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (member.role == 'admin') const Text('Admin'),
+                              if (_removingId == member.id)
+                                const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              else
+                                IconButton(
+                                  tooltip: 'Remove ${member.name}',
+                                  icon: const Icon(
+                                    Icons.person_remove_outlined,
+                                  ),
+                                  onPressed: _adding || _removingId != null
+                                      ? null
+                                      : () => _removeMember(
+                                          member.id,
+                                          member.name,
+                                        ),
+                                ),
+                            ],
+                          )
+                        : member.role == 'admin'
                         ? const Text('Admin')
                         : null,
                   ),
@@ -187,7 +289,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: FilledButton(
-                  onPressed: _selectedIds.isEmpty || _adding
+                  onPressed:
+                      _selectedIds.isEmpty || _adding || _removingId != null
                       ? null
                       : _addMembers,
                   child: Text(

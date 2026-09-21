@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../model/group_model.dart';
 
 abstract class GroupRemoteDataSource {
+  Future<void> removeMember({required int groupId, required int userId});
   Future<GroupModel> getGroup(int groupId);
   Future<GroupModel> addMembers({
     required int groupId,
@@ -33,6 +34,17 @@ class GroupRemoteDataSourceImpl implements GroupRemoteDataSource {
       'Accept': 'application/json',
       'Authorization': 'Bearer $authToken',
     };
+  }
+
+  @override
+  Future<void> removeMember({required int groupId, required int userId}) async {
+    final response = await client.delete(
+      Uri.parse('${ApiEntpoint.url}/groups/$groupId/members/$userId'),
+      headers: await _headers(),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Could not remove member: ${response.body}');
+    }
   }
 
   @override

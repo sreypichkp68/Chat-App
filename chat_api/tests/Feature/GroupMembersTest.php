@@ -48,6 +48,28 @@ class GroupMembersTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonCount(2, 'conversation.users');
+
+        $message = $group->messages()->create([
+            'sender_id' => $newMember->id,
+            'content' => 'Keep this message',
+            'message_type' => 'text',
+        ]);
+
+        $this->actingAs($newMember, 'sanctum')
+            ->deleteJson('/api/groups/'.$group->id.'/members/'.$admin->id)
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson('/api/groups/'.$group->id.'/members/'.$newMember->id)
+            ->assertOk();
+        $this->assertDatabaseMissing('conversation_members', [
+            'conversation_id' => $group->id,
+            'user_id' => $newMember->id,
+        ]);
+        $this->assertDatabaseHas('users', ['id' => $newMember->id]);
+        $this->assertDatabaseHas('messages', ['id' => $message->id]);
+        $this->actingAs($newMember, 'sanctum')
+            ->getJson('/api/groups/'.$group->id)->assertForbidden();
     }
 
     public function test_non_member_cannot_view_group_members(): void

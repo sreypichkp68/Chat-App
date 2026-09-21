@@ -1,3 +1,4 @@
+import 'package:chat_app/feature/message/presentation/widget/conversation_avatar.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
 import 'package:chat_app/core/service/injection_container.dart';
@@ -368,12 +369,8 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                                 ? 'Group call'
                                 : 'Call');
                       return ListTile(
-                        leading: CircleAvatar(
-                          child: Icon(
-                            entry.conversation.isGroup
-                                ? Icons.group_outlined
-                                : Icons.person_outline,
-                          ),
+                        leading: ConversationAvatar(
+                          conversation: entry.conversation,
                         ),
                         title: Text(name),
                         subtitle: Text(
@@ -393,6 +390,7 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                               conversationId: entry.conversation.id,
                               participantId: entry.conversation.participantId,
                               participantName: name,
+                              avatarUrl: entry.conversation.avatarUrl,
                               isGroup: entry.conversation.isGroup,
                             ),
                           ),

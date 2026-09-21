@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:chat_app/feature/group/domain/entity/group_entity.dart';
+import 'package:chat_app/core/widget/profile_avatar_image.dart';
 
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
@@ -23,6 +25,7 @@ class ConversationScreen extends StatefulWidget {
   final int conversationId;
   final String participantId;
   final String participantName;
+  final String? avatarUrl;
   final bool isGroup;
 
   const ConversationScreen({
@@ -30,6 +33,7 @@ class ConversationScreen extends StatefulWidget {
     required this.conversationId,
     required this.participantId,
     required this.participantName,
+    this.avatarUrl,
     this.isGroup = false,
   });
 
@@ -47,6 +51,71 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final _imagePicker = ImagePicker();
   late final CallBloc _callBloc;
   String? _currentUserId;
+  GroupEntity? _headerGroup;
+
+  Future<void> _loadGroupAvatar() async {
+    try {
+      final group = await sl<GroupRemoteDataSource>().getGroup(
+        widget.conversationId,
+      );
+      if (mounted) setState(() => _headerGroup = group);
+    } catch (_) {
+      // Keep the existing avatar when group details are unavailable.
+    }
+  }
+
+  Widget _headerAvatar() {
+    final photo = profileAvatarImage(
+      _headerGroup?.avatarUrl ?? widget.avatarUrl,
+    );
+    final members = _headerGroup?.members ?? const <GroupMemberEntity>[];
+    if (widget.isGroup && photo == null && members.isNotEmpty) {
+      return SizedBox(
+        width: 36,
+        height: 36,
+        child: Stack(
+          children: [
+            for (var index = 0; index < members.length.clamp(0, 2); index++)
+              Positioned(
+                left: index == 0 ? 0 : null,
+                right: index == 1 ? 0 : null,
+                top: index == 0 ? 0 : null,
+                bottom: index == 1 ? 0 : null,
+                child: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: const Color(0xFF34C471),
+                  foregroundImage: profileAvatarImage(members[index].avatarUrl),
+                  onForegroundImageError:
+                      profileAvatarImage(members[index].avatarUrl) == null
+                      ? null
+                      : (_, error) {},
+                  child: Text(
+                    members[index].name.isEmpty
+                        ? '?'
+                        : members[index].name[0].toUpperCase(),
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+    return CircleAvatar(
+      radius: 18,
+      backgroundColor: const Color(0xFF34C471),
+      foregroundImage: photo,
+      onForegroundImageError: photo == null ? null : (_, error) {},
+      child: widget.isGroup
+          ? const Icon(Icons.group, color: Colors.white, size: 19)
+          : Text(
+              widget.participantName.isEmpty
+                  ? '?'
+                  : widget.participantName[0].toUpperCase(),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+    );
+  }
 
   @override
   void initState() {
@@ -54,6 +123,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     _messageBloc = sl<MessageBloc>()
       ..add(MessageLoadRequested(conversationId: widget.conversationId));
     _callBloc = sl<CallBloc>();
+    if (widget.isGroup) _loadGroupAvatar();
     sl<TokenStorage>().getUserId().then((id) {
       if (mounted) setState(() => _currentUserId = id);
     });
@@ -256,21 +326,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFF34C471),
-                    child: widget.isGroup
-                        ? const Icon(Icons.group, color: Colors.white, size: 19)
-                        : Text(
-                            widget.participantName.isEmpty
-                                ? '?'
-                                : widget.participantName[0].toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                  ),
+                  _headerAvatar(),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
