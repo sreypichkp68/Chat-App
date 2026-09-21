@@ -25,11 +25,23 @@ class UserController extends Controller
         ]);
 
         if ($request->hasFile('avatar')) {
-            if ($user->avatar_url) {
-                Storage::disk('public')->delete(str_replace('/storage/', '', $user->avatar_url));
+            try {
+                $uploadedFile = cloudinary()->upload(
+                    $request->file('avatar')->getRealPath(),
+                    ['folder' => 'chat-app/avatars']
+                );
+                $avatarUrl = $uploadedFile->getSecurePath();
+                if (!is_string($avatarUrl) || !str_starts_with($avatarUrl, 'https://')) {
+                    throw new \RuntimeException('Avatar upload did not return a secure URL.');
+                }
+            } catch (\Throwable $error) {
+                report($error);
+
+                return response()->json([
+                    'message' => 'Could not upload your profile photo. Please try again.',
+                ], 502);
             }
-            $path = $request->file('avatar')->store('avatars', 'public');
-            $user->avatar_url = Storage::url($path);
+            $user->avatar_url = $avatarUrl;
         }
 
         if ($request->has('name')) {
@@ -47,8 +59,8 @@ class UserController extends Controller
     public function destroy(Request $request)
     {
         $user = $request->user();
-        if ($user->avatar_url) {
-            Storage::disk('public')->delete(str_replace('/storage/', '', $user->avatar_url));
+        if ($user->avatar_url && str_starts_with($user->avatar_url, '/storage/avatars/')) {
+            Storage::disk('public')->delete(substr($user->avatar_url, strlen('/storage/')));
         }
         $user->delete();
 

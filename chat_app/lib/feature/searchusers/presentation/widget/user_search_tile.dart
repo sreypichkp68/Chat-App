@@ -63,12 +63,29 @@ class _UserSearchTileState extends State<UserSearchTile> {
       ),
       title: Text(
         widget.user.name,
-        style: ChatType.contactName.copyWith(fontSize: 15, color: scheme.onSurface),
+        style: ChatType.contactName.copyWith(
+          fontSize: 15,
+          color: scheme.onSurface,
+        ),
       ),
       subtitle: widget.user.statusMessage != null
-          ? Text(widget.user.statusMessage!, style: ChatType.timestamp.copyWith(color: scheme.onSurfaceVariant))
+          ? Text(
+              widget.user.statusMessage!,
+              style: ChatType.timestamp.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            )
           : null,
-      trailing: widget.onAddFriend == null
+      trailing: widget.user.isFriend
+          ? SizedBox(
+              height: 34,
+              child: FilledButton.icon(
+                onPressed: widget.onTap,
+                icon: const Icon(Icons.send, size: 16),
+                label: const Text('Send'),
+              ),
+            )
+          : widget.onAddFriend == null
           ? null
           : SizedBox(
               height: 34,

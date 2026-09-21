@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 
 import 'package:chat_app/core/constants/api_entpoint.dart';
 import 'package:chat_app/core/service/token_storage.dart';
@@ -11,15 +12,16 @@ class ProfileRemoteDataSource {
 
   const ProfileRemoteDataSource({required this.client, required this.storage});
 
-  Future<UserProfile> load() async {
+  Future<UserProfile> load({bool requireFresh = false}) async {
     final name = await storage.getUserName();
     final email = await storage.getUserEmail();
-    if ((name ?? '').isNotEmpty || (email ?? '').isNotEmpty) {
-      return UserProfile(name: name ?? '', email: email ?? '');
-    }
+    final cached = UserProfile(name: name ?? '', email: email ?? '');
 
     final token = await storage.getToken();
-    if (token == null || token.isEmpty) return UserProfile.empty;
+    if (token == null || token.isEmpty) {
+      if (requireFresh) throw Exception('Please sign in again.');
+      return cached;
+    }
 
     try {
       final response = await client.get(
@@ -30,7 +32,7 @@ class ProfileRemoteDataSource {
         },
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        return UserProfile.empty;
+        throw Exception('Could not load profile. Please try again.');
       }
 
       final decoded = jsonDecode(response.body);
@@ -45,15 +47,57 @@ class ProfileRemoteDataSource {
           : data is Map<String, dynamic>
           ? data
           : root;
-      final profile = UserProfile(
-        name: user['name'] as String? ?? user['username'] as String? ?? '',
-        email: user['email'] as String? ?? '',
-      );
+      final profile = UserProfile.fromJson(user);
       await storage.saveUserProfile(name: profile.name, email: profile.email);
       if (user['id'] != null) await storage.saveUserId(user['id'].toString());
       return profile;
     } catch (_) {
-      return UserProfile.empty;
+      if (requireFresh) rethrow;
+      return cached;
     }
+  }
+
+  Future<UserProfile> update({
+    required String name,
+    required String statusMessage,
+    XFile? avatar,
+  }) async {
+    final token = await storage.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Please sign in again.');
+    }
+    final request =
+        http.MultipartRequest('POST', Uri.parse(ApiEntpoint.currentUser))
+          ..headers.addAll({
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          })
+          ..fields.addAll({
+            '_method': 'PUT',
+            'name': name.trim(),
+            'status_message': statusMessage.trim(),
+          });
+    if (avatar != null) {
+      final bytes = await avatar.readAsBytes();
+      if (bytes.length > 5000 * 1024) {
+        throw Exception('Choose a photo smaller than 5 MB.');
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes('avatar', bytes, filename: avatar.name),
+      );
+    }
+    final response = await http.Response.fromStream(await client.send(request));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      String message = 'Could not save profile. Please try again.';
+      try {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        message = body['message'] as String? ?? message;
+      } catch (_) {}
+      throw Exception(message);
+    }
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final profile = UserProfile.fromJson(body['user'] as Map<String, dynamic>);
+    await storage.saveUserProfile(name: profile.name, email: profile.email);
+    return profile;
   }
 }

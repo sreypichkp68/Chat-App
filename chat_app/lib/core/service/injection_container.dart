@@ -93,7 +93,11 @@ void initDependencies() {
     ),
   );
   sl.registerLazySingleton<UserRemoteDatasource>(
-    () => UserRemoteDatasourceImpl(client: sl(), tokenStorage: sl()),
+    () => UserRemoteDatasourceImpl(
+      client: sl(),
+      tokenStorage: sl(),
+      friendsDatasource: sl(),
+    ),
   );
   sl.registerLazySingleton<UserSearchRepo>(
     () => UserRearchRepoImpl(sl<UserRemoteDatasource>()),

@@ -6,14 +6,19 @@ class UserModel extends UserEntity {
     required super.name,
     super.avatarUrl,
     super.statusMessage,
+    super.isFriend,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) {
+  factory UserModel.fromJson(
+    Map<String, dynamic> json, {
+    bool isFriend = false,
+  }) {
     return UserModel(
       id: json['id'].toString(),
       name: json['name'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String?,
       statusMessage: json['status_message'] as String?,
+      isFriend: isFriend,
     );
   }
 }

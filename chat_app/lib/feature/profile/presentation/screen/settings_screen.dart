@@ -7,6 +7,7 @@ import 'package:chat_app/feature/profile/data/datasource/profile_remote_data_sou
 import 'package:chat_app/feature/profile/domain/entity/user_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'edit_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -54,6 +55,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (_) => false,
     );
+  }
+
+  Future<void> _editProfile() async {
+    final profile = await Navigator.of(context).push<UserProfile>(
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(
+          datasource: ProfileRemoteDataSource(
+            client: sl<http.Client>(),
+            storage: sl<TokenStorage>(),
+          ),
+        ),
+      ),
+    );
+    if (!mounted || profile == null) return;
+    setState(() {
+      _profile = Future.value(profile);
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Profile updated.')));
   }
 
   void _showComingSoon(String title) {
@@ -134,7 +155,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      _ProfileCard(name: displayName, email: profile.email),
+                      _ProfileCard(
+                        name: displayName,
+                        email: profile.email,
+                        avatarUrl: profile.avatarUrl,
+                      ),
                       const SizedBox(height: 18),
                       _SettingsSection(
                         title: 'Account',
@@ -142,7 +167,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           _SettingsTile(
                             icon: Icons.person_outline_rounded,
                             title: 'Manage Profile',
-                            onTap: () => _showComingSoon('Manage profile'),
+                            onTap: _editProfile,
                           ),
                           _SettingsTile(
                             icon: Icons.lock_outline_rounded,
@@ -219,7 +244,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({required this.name, required this.email});
+  const _ProfileCard({required this.name, required this.email, this.avatarUrl});
+
+  final String? avatarUrl;
 
   final String name;
   final String email;
@@ -238,6 +265,14 @@ class _ProfileCard extends StatelessWidget {
           CircleAvatar(
             radius: 30,
             backgroundColor: scheme.primaryContainer,
+            foregroundImage: avatarUrl != null && avatarUrl!.isNotEmpty
+                ? NetworkImage(
+                    Uri.parse(ApiEntpoint.url).resolve(avatarUrl!).toString(),
+                  )
+                : null,
+            onForegroundImageError: avatarUrl != null && avatarUrl!.isNotEmpty
+                ? (_, stack) {}
+                : null,
             child: Text(
               name[0].toUpperCase(),
               style: TextStyle(
