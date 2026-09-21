@@ -107,8 +107,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
     }
     if (widget.isGroup) {
       try {
-        final group = await sl<GroupRemoteDataSource>().getGroup(widget.conversationId);
-        final currentUserId = _currentUserId ?? await sl<TokenStorage>().getUserId();
+        final group = await sl<GroupRemoteDataSource>().getGroup(
+          widget.conversationId,
+        );
+        final currentUserId =
+            _currentUserId ?? await sl<TokenStorage>().getUserId();
         final members = group.members
             .where((member) => member.id.toString() != currentUserId)
             .map((member) => member.id.toString())
@@ -120,12 +123,14 @@ class _ConversationScreenState extends State<ConversationScreen> {
           );
           return;
         }
-        _callBloc.add(GroupCallStartRequested(
-          groupId: widget.conversationId,
-          groupName: widget.participantName,
-          memberIds: members,
-          isVideo: isVideo,
-        ));
+        _callBloc.add(
+          GroupCallStartRequested(
+            groupId: widget.conversationId,
+            groupName: widget.participantName,
+            memberIds: members,
+            isVideo: isVideo,
+          ),
+        );
       } catch (error) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,11 +139,13 @@ class _ConversationScreenState extends State<ConversationScreen> {
         return;
       }
     } else {
-      _callBloc.add(CallStartRequested(
-        peerId: widget.participantId,
-        peerName: widget.participantName,
-        isVideo: isVideo,
-      ));
+      _callBloc.add(
+        CallStartRequested(
+          peerId: widget.participantId,
+          peerName: widget.participantName,
+          isVideo: isVideo,
+        ),
+      );
     }
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -234,9 +241,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
             onTap: widget.isGroup
                 ? () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => GroupMembersScreen(
-                        groupId: widget.conversationId,
-                      ),
+                      builder: (_) =>
+                          GroupMembersScreen(groupId: widget.conversationId),
                     ),
                   )
                 : () {
@@ -283,39 +289,39 @@ class _ConversationScreenState extends State<ConversationScreen> {
             ),
           ),
           actions: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.call_outlined,
-                      color: scheme.onSurfaceVariant,
+            IconButton(
+              icon: Icon(Icons.call_outlined, color: scheme.onSurfaceVariant),
+              onPressed: () => _startCall(isVideo: false),
+            ),
+            IconButton(
+              icon: Icon(
+                Icons.videocam_outlined,
+                color: scheme.onSurfaceVariant,
+              ),
+              onPressed: () => _startCall(isVideo: true),
+            ),
+            const SizedBox(width: 6),
+            IconButton(
+              icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
+              onPressed: () {
+                if (widget.isGroup) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          GroupMembersScreen(groupId: widget.conversationId),
                     ),
-                    onPressed: () => _startCall(isVideo: false),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.videocam_outlined,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    onPressed: () => _startCall(isVideo: true),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
-                    onPressed: () {
-                      if (widget.isGroup) {
-                        Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => GroupMembersScreen(groupId: widget.conversationId),
-                        ));
-                      } else {
-                        AboutUser.show(
-                          context,
-                          participantName: widget.participantName,
-                          participantId: widget.participantId,
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 12),
-                ],
+                  );
+                } else {
+                  AboutUser.show(
+                    context,
+                    participantName: widget.participantName,
+                    participantId: widget.participantId,
+                  );
+                }
+              },
+            ),
+            const SizedBox(width: 12),
+          ],
         ),
         body: Column(
           children: [
@@ -327,7 +333,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                       ? null
                       : state.messages.last.id;
                   final isInitialLoad = !_hasLoadedInitialMessages;
-                  final isNearBottom = !_scrollController.hasClients ||
+                  final isNearBottom =
+                      !_scrollController.hasClients ||
                       _scrollController.position.extentAfter < 80;
                   if (latestId != null &&
                       latestId != _lastVisibleMessageId &&
@@ -383,28 +390,22 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-                    itemCount: messages.length + 1,
+                    itemCount: messages.length,
                     itemBuilder: (_, index) {
-                      if (index == 0)
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.only(bottom: 18),
-                            child: Chip(
-                              label: Text(
-                                'Today',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                          ),
-                        );
-
-                      final message = messages[index - 1];
+                      final message = messages[index];
+                      final date = message.createdAt.toLocal();
+                      final startsDay =
+                          index == 0 ||
+                          !DateUtils.isSameDay(
+                            date,
+                            messages[index - 1].createdAt.toLocal(),
+                          );
                       final sentByMe = widget.isGroup
                           ? message.id < 0 ||
                                 message.senderId.toString() == _currentUserId
                           : message.senderId.toString() != widget.participantId;
 
-                      return _MessageBubble(
+                      final bubble = _MessageBubble(
                         message: message,
                         sentByMe: sentByMe,
                         senderName: widget.isGroup && !sentByMe
@@ -419,6 +420,25 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                 _startCall(isVideo: callType == 'video');
                               }
                             : null,
+                      );
+                      return Column(
+                        children: [
+                          if (startsDay)
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.only(bottom: 18),
+                                child: Chip(
+                                  label: Text(
+                                    MaterialLocalizations.of(
+                                      context,
+                                    ).formatMediumDate(date),
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          bubble,
+                        ],
                       );
                     },
                   );
@@ -713,9 +733,7 @@ class _CallLogBubble extends StatelessWidget {
       case 'declined':
         icon = Icons.call_missed_rounded;
         iconColor = const Color(0xFFE0433C);
-        label = isGroupCall
-            ? 'Missed group call'
-            : 'Missed call';
+        label = isGroupCall ? 'Missed group call' : 'Missed call';
         break;
       case 'ended':
       default:

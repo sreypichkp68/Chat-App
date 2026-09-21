@@ -31,6 +31,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<ConversationSummary>? _visibleConversations;
   bool _initialLoadInProgress = true;
   bool _refreshInProgress = false;
+  int _conversationRevision = 0;
   final Map<int, String> _lastMessageKeys = {};
   bool _hasConversationSnapshot = false;
 
@@ -74,8 +75,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return requests.length;
   }
 
-  Future<List<ConversationSummary>> _loadConversations() {
-    return sl<MessageDataSource>().getConversations();
+  Future<List<ConversationSummary>> _loadConversations() async {
+    final conversations = List<ConversationSummary>.of(
+      await sl<MessageDataSource>().getConversations(),
+    );
+    conversations.sort((a, b) {
+      final aTime = a.lastMessageAt;
+      final bTime = b.lastMessageAt;
+      if (aTime == null && bTime != null) return 1;
+      if (aTime != null && bTime == null) return -1;
+      final byTime = aTime == null ? 0 : bTime!.compareTo(aTime);
+      return byTime != 0 ? byTime : a.id.compareTo(b.id);
+    });
+    return conversations;
+  }
+
+  DateTime? _chatDay(DateTime? value) {
+    if (value == null) return null;
+    final local = value.toLocal();
+    return DateTime(local.year, local.month, local.day);
+  }
+
+  String _dayLabel(BuildContext context, DateTime? day, DateTime now) {
+    if (day == null) return 'No messages yet';
+    final today = DateTime(now.year, now.month, now.day);
+    if (day == today) return 'Today';
+    if (day == DateTime(now.year, now.month, now.day - 1)) {
+      return 'Yesterday';
+    }
+    return MaterialLocalizations.of(context).formatMediumDate(day);
   }
 
   String _messageKey(ConversationSummary conversation) {
@@ -85,10 +113,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _refreshConversations() async {
     if (_refreshInProgress) return;
     _refreshInProgress = true;
+    final revision = _conversationRevision;
     try {
       final conversations = await _loadConversations();
       final currentUserId = await sl<TokenStorage>().getUserId();
-      if (!mounted) return;
+      if (!mounted || revision != _conversationRevision) return;
 
       final incoming = <ConversationSummary>[];
       for (final conversation in conversations) {
@@ -180,12 +209,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<bool> _deleteFriend(FriendContact friend) async {
+  Future<void> _removeChat(ConversationSummary conversation) async {
+    if (conversation.isGroup) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove friend?'),
-        content: Text('Remove ${friend.name} from your contacts?'),
+        title: const Text('Remove chat?'),
+        content: Text(
+          'Remove the chat with ${conversation.participantName} from your list? '
+          'Your contact and messages are kept. You can chat again anytime.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -198,26 +231,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return false;
+    if (confirmed != true || !mounted) return;
 
     try {
-      await sl<FriendRequestRemoteDatasource>().deleteFriend(
-        friendId: friend.id,
+      await sl<MessageDataSource>().removeConversation(
+        conversationId: conversation.id,
       );
-      if (!mounted) return false;
+      if (!mounted) return;
       setState(() {
-        _conversations = _loadConversations();
+        _conversationRevision++;
+        _visibleConversations = (_visibleConversations ?? [])
+            .where((item) => item.id != conversation.id)
+            .toList();
+        _conversations = Future.value(_visibleConversations!);
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('${friend.name} was removed.')));
-      return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Chat with ${conversation.participantName} removed.'),
+        ),
+      );
     } catch (error) {
-      if (!mounted) return false;
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('$error')));
-      return false;
     }
   }
 
@@ -422,6 +459,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         }
                         final conversations = snapshot.data ?? const [];
                         if (conversations.isEmpty) return const _EmptyState();
+                        final now = DateTime.now();
                         return ListView.separated(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20,
@@ -432,58 +470,99 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                               const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final conversation = conversations[index];
-                            return Dismissible(
+                            final day = _chatDay(conversation.lastMessageAt);
+                            final startsDay =
+                                index == 0 ||
+                                day !=
+                                    _chatDay(
+                                      conversations[index - 1].lastMessageAt,
+                                    );
+                            return Column(
                               key: ValueKey(conversation.id),
-                              direction: DismissDirection.endToStart,
-                              confirmDismiss: (_) => Future.value(false),
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 20),
-                                color: Colors.red,
-                                child: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              child: ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: CircleAvatar(
-                                  backgroundColor: _green,
-                                  child: Text(
-                                    conversation.participantName.isEmpty
-                                        ? '?'
-                                        : conversation.participantName[0]
-                                              .toUpperCase(),
-                                    style: const TextStyle(color: Colors.white),
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (startsDay)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 12,
+                                      bottom: 8,
+                                    ),
+                                    child: Text(
+                                      _dayLabel(context, day, now),
+                                      style: TextStyle(
+                                        color: scheme.onSurfaceVariant,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                Dismissible(
+                                  key: ValueKey(conversation.id),
+                                  direction: conversation.isGroup
+                                      ? DismissDirection.none
+                                      : DismissDirection.endToStart,
+                                  confirmDismiss: (_) async {
+                                    await _removeChat(conversation);
+                                    // The refreshed list removes the row.
+                                    return false;
+                                  },
+                                  background: Container(
+                                    alignment: Alignment.centerRight,
+                                    padding: const EdgeInsets.only(right: 20),
+                                    color: Colors.red,
+                                    child: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  child: ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: CircleAvatar(
+                                      backgroundColor: _green,
+                                      child: Text(
+                                        conversation.participantName.isEmpty
+                                            ? '?'
+                                            : conversation.participantName[0]
+                                                  .toUpperCase(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      conversation.participantName,
+                                      style: TextStyle(
+                                        color: scheme.onSurface,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      conversation.lastMessage,
+                                      style: conversation.isMissedCall
+                                          ? const TextStyle(
+                                              color: Color(0xFFE0433C),
+                                            )
+                                          : null,
+                                    ),
+                                    trailing: Text(
+                                      _formatChatTime(
+                                        conversation.lastMessageAt,
+                                      ),
+                                      style: const TextStyle(
+                                        color: _inkFaint,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    onTap: () => _showConversation(
+                                      conversationId: conversation.id,
+                                      participantId: conversation.participantId,
+                                      participantName:
+                                          conversation.participantName,
+                                      isGroup: conversation.isGroup,
+                                    ),
                                   ),
                                 ),
-                                title: Text(
-                                  conversation.participantName,
-                                  style: TextStyle(
-                                    color: scheme.onSurface,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  conversation.lastMessage,
-                                  style: conversation.isMissedCall
-                                      ? const TextStyle(color: Color(0xFFE0433C))
-                                      : null,
-                                ),
-                                trailing: Text(
-                                  _formatChatTime(conversation.lastMessageAt),
-                                  style: const TextStyle(
-                                    color: _inkFaint,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                onTap: () => _showConversation(
-                                  conversationId: conversation.id,
-                                  participantId: conversation.participantId,
-                                  participantName: conversation.participantName,
-                                  isGroup: conversation.isGroup,
-                                ),
-                              ),
+                              ],
                             );
                           },
                         );
@@ -510,7 +589,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         key: ValueKey(state.results[i].id),
                         user: state.results[i],
                         onTap: () {
-                          // TODO: navigate into a new/existing conversation
+                          final user = state.results[i];
+                          _openConversation(
+                            FriendContact(
+                              id: user.id,
+                              name: user.name,
+                              email: '',
+                            ),
+                          );
                         },
                         onAddFriend: () => sl<FriendRequestRemoteDatasource>()
                             .sendFriendRequest(receiverId: state.results[i].id),

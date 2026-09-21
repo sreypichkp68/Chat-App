@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/user/profile', [UserController::class, 'destroy']);
     // Conversations
     Route::get('/conversations', [ConversationController::class, 'index']);
+    Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
     Route::post('/conversations', [ConversationController::class, 'store']);
     // Messages
     Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);

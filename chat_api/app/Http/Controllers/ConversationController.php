@@ -14,13 +14,22 @@ class ConversationController extends Controller
     $user = $request->user();
 
     $conversations = Conversation::whereHas('members', function ($q) use ($user) {
-        $q->where('user_id', $user->id);
+        $q->where('user_id', $user->id)->where('chat_hidden', false);
     })
     ->with(['lastMessage', 'members.user:id,name,avatar_url'])
     ->get();
 
     return response()->json($conversations);
 }
+
+    public function destroy(Request $request, Conversation $conversation)
+    {
+        $member = $conversation->members()->where('user_id', $request->user()->id)->firstOrFail();
+        $member->chat_hidden = true;
+        $member->save();
+
+        return response()->json(['message' => 'Chat removed from your list.']);
+    }
 
     public function store(Request $request)
     {
@@ -45,6 +54,8 @@ class ConversationController extends Controller
             ->first();
 
         if ($existingConversation) {
+            $existingConversation->members()->where('user_id', $authUserId)
+                ->update(['chat_hidden' => false]);
             return response()->json([
                 'message' => 'Conversation already exists',
                 'conversation' => $existingConversation->load('members.user:id,name,avatar_url')

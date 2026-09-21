@@ -6,6 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
 {
+    protected static function booted(): void
+    {
+        static::created(function (Message $message) {
+            ConversationMember::where('conversation_id', $message->conversation_id)
+                ->where('chat_hidden', true)
+                ->update(['chat_hidden' => false]);
+        });
+    }
+
     protected $fillable = [
         'conversation_id',
         'sender_id',

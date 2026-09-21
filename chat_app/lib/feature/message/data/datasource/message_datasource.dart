@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 
 abstract class MessageDataSource {
   Future<List<ConversationSummary>> getConversations();
+  Future<void> removeConversation({required int conversationId});
 
   /// Returns the existing direct conversation with [participantId], or creates it.
   Future<int> openDirectConversation({required String participantId});
@@ -192,6 +193,17 @@ class MessageDataSourceImpl implements MessageDataSource {
       if (json) 'Content-Type': 'application/json',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
+  }
+
+  @override
+  Future<void> removeConversation({required int conversationId}) async {
+    final response = await client.delete(
+      Uri.parse('${ApiEntpoint.conversations}/$conversationId'),
+      headers: await _headers(),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Could not remove chat: ${response.body}');
+    }
   }
 
   @override
