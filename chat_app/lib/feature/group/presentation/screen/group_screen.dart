@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'dart:async';
 import 'package:chat_app/feature/message/presentation/widget/conversation_avatar.dart';
 
@@ -122,10 +123,10 @@ class _GroupScreenState extends State<GroupScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         backgroundColor: background,
         surfaceTintColor: background,
-        title: const Text('Groups'),
+        title: Text('Groups'.tr),
         actions: [
           IconButton(
-            tooltip: 'Create group',
+            tooltip: 'Create group'.tr,
             onPressed: _createGroup,
             icon: const Icon(Icons.group_add_outlined),
           ),
@@ -138,8 +139,8 @@ class _GroupScreenState extends State<GroupScreen> with WidgetsBindingObserver {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Could not load groups'),
-                  TextButton(onPressed: _refresh, child: const Text('Retry')),
+                  Text('Could not load groups'.tr),
+                  TextButton(onPressed: _refresh, child: Text('Retry'.tr)),
                 ],
               ),
             )
@@ -147,9 +148,9 @@ class _GroupScreenState extends State<GroupScreen> with WidgetsBindingObserver {
               onRefresh: _refresh,
               child: _groups.isEmpty
                   ? ListView(
-                      children: const [
+                      children: [
                         SizedBox(height: 180),
-                        Center(child: Text('No groups yet')),
+                        Center(child: Text('No groups yet'.tr)),
                       ],
                     )
                   : ListView.separated(

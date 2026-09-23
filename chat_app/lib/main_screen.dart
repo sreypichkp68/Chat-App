@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/feature/message/presentation/screen/chat_screen.dart';
 import 'package:chat_app/feature/profile/presentation/screen/settings_screen.dart';
 import 'package:chat_app/feature/group/presentation/screen/group_screen.dart';
@@ -33,13 +34,16 @@ class _MainScreenState extends State<MainScreen> {
           });
         },
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Char"),
-          BottomNavigationBarItem(icon: Icon(Icons.phone), label: "Call"),
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Chats".tr),
+          BottomNavigationBarItem(icon: Icon(Icons.phone), label: "Calls".tr),
           BottomNavigationBarItem(
             icon: Icon(Icons.group_outlined),
-            label: "Group",
+            label: "Groups".tr,
           ),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Setting"),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: "Settings".tr,
+          ),
         ],
       ),
     );

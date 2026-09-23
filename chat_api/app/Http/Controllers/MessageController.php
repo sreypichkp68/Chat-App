@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\MessageSent;
 use App\Models\Message;
+use App\Models\ConversationMember;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Reverb\Loggers\Log;
@@ -23,11 +24,16 @@ class MessageController extends Controller
 
     public function store(Request $request, $conversationId)
     {
+        abort_unless(ConversationMember::where('conversation_id', $conversationId)
+            ->where('user_id', $request->user()->id)->exists(), 403);
+
         $request->validate([
             'message_type' => 'required|in:text,image,audio,file,call_log',
             'content' => 'nullable|string',
-            'file' => 'nullable|file|max:20480',
-            'audio_duration' => 'nullable|integer',
+            'file' => $request->input('message_type') === 'audio'
+                ? 'required|file|mimes:m4a,mp4,mp3,wav,aac,ogg,webm|max:10240'
+                : 'nullable|file|max:20480',
+            'audio_duration' => 'required_if:message_type,audio|nullable|integer|min:1|max:300',
             'reply_to_message_id' => 'nullable|exists:messages,id',
             'metadata' => 'nullable|array', // new
         ]);
@@ -35,7 +41,22 @@ class MessageController extends Controller
         // Start with whatever metadata the client already sent (e.g. Cloudinary imageUrl).
         $metadata = $request->input('metadata', []) ?? [];
 
-        if ($request->hasFile('file')) {
+        if ($request->message_type === 'audio') {
+            try {
+                $uploaded = cloudinary()->uploadVideo(
+                    $request->file('file')->getRealPath(),
+                    ['folder' => 'chat-app/voice-messages']
+                );
+                $url = $uploaded->getSecurePath();
+                if (!is_string($url) || !str_starts_with($url, 'https://')) {
+                    throw new \RuntimeException('Audio upload did not return a secure URL.');
+                }
+                $metadata = ['audio_url' => $url];
+            } catch (\Throwable $error) {
+                report($error);
+                return response()->json(['message' => 'Could not upload voice message. Please try again.'], 502);
+            }
+        } elseif ($request->hasFile('file')) {
             $path = $request->file('file')->store("chats/{$conversationId}", 'public');
             $metadata['file_url'] = Storage::url($path);
             $metadata['file_name'] = $request->file('file')->getClientOriginalName();

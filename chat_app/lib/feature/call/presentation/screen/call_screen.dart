@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/feature/message/presentation/widget/conversation_avatar.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
@@ -47,8 +48,8 @@ class CallScreen extends StatelessWidget {
               ? state.session.peerName
               : initialPeerName;
           final statusLabel = switch (state) {
-            CallOutgoingRinging() => 'Calling…',
-            CallConnecting() => 'Connecting...',
+            CallOutgoingRinging() => 'Calling…'.tr,
+            CallConnecting() => 'Connecting...'.tr,
             CallConnected(elapsed: final e) => _formatElapsed(e),
             CallFinished(reason: final r) => r,
             _ => '',
@@ -321,10 +322,10 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
             child: Text(
-              'Calls',
+              'Calls'.tr,
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
           ),
@@ -340,13 +341,13 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                     child: TextButton.icon(
                       onPressed: _refresh,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('Could not load calls. Retry'),
+                      label: Text('Could not load calls. Retry'.tr),
                     ),
                   );
                 }
                 final entries = snapshot.data!;
                 if (entries.isEmpty) {
-                  return const Center(child: Text('No calls yet'));
+                  return Center(child: Text('No calls yet'.tr));
                 }
                 return RefreshIndicator(
                   onRefresh: _refresh,
@@ -365,11 +366,11 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
                           '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(date))}';
                       final label = missed
                           ? (entry.conversation.isGroup
-                                ? 'Missed group call'
-                                : 'Missed call')
+                                ? 'Missed group call'.tr
+                                : 'Missed call'.tr)
                           : (entry.conversation.isGroup
-                                ? 'Group call'
-                                : 'Call');
+                                ? 'Group call'.tr
+                                : 'Call'.tr);
                       return ListTile(
                         leading: ConversationAvatar(
                           conversation: entry.conversation,

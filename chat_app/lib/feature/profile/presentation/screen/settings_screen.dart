@@ -1,3 +1,5 @@
+import 'package:chat_app/core/localization/language_controller.dart';
+import 'package:get/get.dart';
 import 'package:chat_app/core/constants/api_entpoint.dart';
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
@@ -74,13 +76,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Profile updated.')));
+    ).showSnackBar(SnackBar(content: Text('Profile updated.'.tr)));
   }
 
   void _showComingSoon(String title) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$title settings are coming soon.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Settings for @title are coming soon.'.trParams({'title': title}),
+        ),
+      ),
+    );
   }
 
   Future<void> _chooseTheme() async {
@@ -88,7 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final selected = await showDialog<ThemeMode>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Theme'),
+        title: Text('Theme'.tr),
         contentPadding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -100,7 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ? Icons.light_mode_outlined
                       : Icons.dark_mode_outlined,
                 ),
-                title: Text(choice == ThemeMode.light ? 'Light' : 'Dark'),
+                title: Text(choice == ThemeMode.light ? 'Light'.tr : 'Dark'.tr),
                 trailing: current == choice ? const Icon(Icons.check) : null,
                 onTap: () => Navigator.pop(dialogContext, choice),
               ),
@@ -114,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save theme preference.')),
+        SnackBar(content: Text('Could not save theme preference.'.tr)),
       );
     }
   }
@@ -132,7 +138,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           future: _profile,
           builder: (context, snapshot) {
             final profile = snapshot.data ?? UserProfile.empty;
-            final displayName = profile.name.isNotEmpty ? profile.name : 'User';
+            final displayName = profile.name.isNotEmpty
+                ? profile.name
+                : 'User'.tr;
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
@@ -140,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
                     child: Text(
-                      'Profile',
+                      'Profile'.tr,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: scheme.onSurface,
@@ -162,68 +170,74 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 18),
                       _SettingsSection(
-                        title: 'Account',
+                        title: 'Account'.tr,
                         children: [
                           _SettingsTile(
                             icon: Icons.person_outline_rounded,
-                            title: 'Manage Profile',
+                            title: 'Manage Profile'.tr,
                             onTap: _editProfile,
                           ),
                           _SettingsTile(
                             icon: Icons.lock_outline_rounded,
-                            title: 'Password & Security',
-                            onTap: () => _showComingSoon('Password & security'),
+                            title: 'Password & Security'.tr,
+                            onTap: () =>
+                                _showComingSoon('Password & Security'.tr),
                           ),
                           _SettingsTile(
                             icon: Icons.notifications_none_rounded,
-                            title: 'Notifications',
-                            onTap: () => _showComingSoon('Notifications'),
+                            title: 'Notifications'.tr,
+                            onTap: () => _showComingSoon('Notifications'.tr),
                           ),
                           _SettingsTile(
                             icon: Icons.language_rounded,
-                            title: 'Language',
-                            value: 'English',
-                            onTap: () => _showComingSoon('Language'),
+                            title: 'Language'.tr,
+                            value: LanguageController
+                                .names[LanguageController.locale.languageCode],
+                            onTap: () => LanguageController.showPicker(context),
                           ),
                         ],
                       ),
                       const SizedBox(height: 18),
                       _SettingsSection(
-                        title: 'Preferences',
+                        title: 'Preferences'.tr,
                         children: [
                           _SettingsTile(
                             icon: Icons.article_outlined,
-                            title: 'About Us',
-                            onTap: () => _showComingSoon('About us'),
+                            title: 'About Us'.tr,
+                            onTap: () => _showComingSoon('About Us'.tr),
                           ),
                           ValueListenableBuilder<ThemeMode>(
                             valueListenable: ThemeController.mode,
                             builder: (context, mode, _) => _SettingsTile(
                               icon: Icons.contrast_outlined,
-                              title: 'Theme',
-                              value: mode == ThemeMode.dark ? 'Dark' : 'Light',
+                              title: 'Theme'.tr,
+                              value: mode == ThemeMode.dark
+                                  ? 'Dark'.tr
+                                  : 'Light'.tr,
                               onTap: _chooseTheme,
                             ),
                           ),
                           _SettingsTile(
                             icon: Icons.calendar_today_outlined,
-                            title: 'Appointments',
-                            onTap: () => _showComingSoon('Appointments'),
+                            title: 'Appointments'.tr,
+                            onTap: () => _showComingSoon('Appointments'.tr),
                           ),
                         ],
                       ),
                       const SizedBox(height: 18),
                       _SettingsSection(
-                        title: 'Support',
+                        title: 'Support'.tr,
                         children: [
                           _SettingsTile(
                             icon: Icons.help_outline_rounded,
-                            title: 'Help Center',
-                            onTap: () => _showComingSoon('Help center'),
+                            title: 'Help Center'.tr,
+                            onTap: () => _showComingSoon('Help Center'.tr),
                           ),
                           _SettingsTile(
                             icon: Icons.logout_rounded,
-                            title: _isLoggingOut ? 'Logging out...' : 'Log out',
+                            title: _isLoggingOut
+                                ? 'Logging out...'.tr
+                                : 'Log out'.tr,
                             isDestructive: true,
                             showChevron: false,
                             onTap: _isLoggingOut ? null : _logout,
@@ -299,7 +313,7 @@ class _ProfileCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  email.isNotEmpty ? email : 'No email address',
+                  email.isNotEmpty ? email : 'No email address'.tr,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

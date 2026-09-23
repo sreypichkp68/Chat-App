@@ -6,6 +6,11 @@ import 'package:chat_app/feature/message/data/model/message_model.dart';
 import 'package:http/http.dart' as http;
 
 abstract class MessageDataSource {
+  Future<MessageModel> sendVoiceMessage({
+    required int conversationId,
+    required File audioFile,
+    required int durationSeconds,
+  });
   Future<void> deleteMessage(int messageId);
   Future<List<ConversationSummary>> getConversations();
   Future<void> removeConversation({required int conversationId});
@@ -80,11 +85,12 @@ class ConversationSummary {
         .whereType<Map>()
         .where((member) => member['user_id']?.toString() == currentUserId)
         .firstOrNull;
-    final lastReadId = int.tryParse(
-      ownMember?['last_read_message_id']?.toString() ?? '',
-    ) ?? 0;
-    final lastMessageId = int.tryParse(lastMessage['id']?.toString() ?? '') ?? 0;
-    final isUnread = !isGroup &&
+    final lastReadId =
+        int.tryParse(ownMember?['last_read_message_id']?.toString() ?? '') ?? 0;
+    final lastMessageId =
+        int.tryParse(lastMessage['id']?.toString() ?? '') ?? 0;
+    final isUnread =
+        !isGroup &&
         currentUserId != null &&
         ownMember != null &&
         lastMessage['sender_id'] != null &&
@@ -219,6 +225,30 @@ class ConversationSummary {
 }
 
 class MessageDataSourceImpl implements MessageDataSource {
+  @override
+  Future<MessageModel> sendVoiceMessage({
+    required int conversationId,
+    required File audioFile,
+    required int durationSeconds,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiEntpoint.conversations}/$conversationId/messages'),
+    )..headers.addAll(await _headers());
+    request.fields.addAll({
+      'message_type': 'audio',
+      'audio_duration': durationSeconds.toString(),
+    });
+    request.files.add(
+      await http.MultipartFile.fromPath('file', audioFile.path),
+    );
+    final response = await http.Response.fromStream(await client.send(request));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Could not send voice message (${response.statusCode}).');
+    }
+    return _messageFromResponseItem(jsonDecode(response.body));
+  }
+
   @override
   Future<void> deleteMessage(int messageId) async {
     final response = await client.delete(

@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/friends/data/datasource/friend_request_remote_datasource.dart';
@@ -31,18 +32,18 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove member?'),
+        title: Text('Remove member?'.tr),
         content: Text(
           'Remove $name from this group? Their account and existing messages will be kept.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text('Remove'.tr),
           ),
         ],
       ),
@@ -128,9 +129,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
         _group = group;
         _selectedIds.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Members added to the group')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Members added to the group'.tr)));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -162,10 +163,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Group members'),
+        title: Text('Group members'.tr),
         actions: [
           IconButton(
-            tooltip: 'Refresh profiles',
+            tooltip: 'Refresh profiles'.tr,
             onPressed: _loading || _adding || _removingId != null
                 ? null
                 : _load,
@@ -181,7 +182,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(_error!, textAlign: TextAlign.center),
-                  TextButton(onPressed: _load, child: const Text('Retry')),
+                  TextButton(onPressed: _load, child: Text('Retry'.tr)),
                 ],
               ),
             )
@@ -212,7 +213,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                         ? Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (member.role == 'admin') const Text('Admin'),
+                              if (member.role == 'admin') Text('Admin'.tr),
                               if (_removingId == member.id)
                                 const SizedBox(
                                   width: 24,
@@ -237,7 +238,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                             ],
                           )
                         : member.role == 'admin'
-                        ? const Text('Admin')
+                        ? Text('Admin'.tr)
                         : null,
                   ),
                 ),
@@ -249,8 +250,8 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                   ),
                   const SizedBox(height: 8),
                   TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search friends',
+                    decoration: InputDecoration(
+                      hintText: 'Search friends'.tr,
                       prefixIcon: Icon(Icons.search),
                     ),
                     onChanged: (value) =>
@@ -258,9 +259,9 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                   ),
                   const SizedBox(height: 8),
                   if (availableFriends.isEmpty)
-                    const Padding(
+                    Padding(
                       padding: EdgeInsets.all(16),
-                      child: Text('No friends available to add.'),
+                      child: Text('No friends available to add.'.tr),
                     ),
                   ...availableFriends.map((friend) {
                     final id = int.parse(friend.id);

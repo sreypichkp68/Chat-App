@@ -1,3 +1,5 @@
+import 'package:get/get.dart';
+import 'package:chat_app/core/localization/language_controller.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_bloc.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_event.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/login_state.dart';
@@ -48,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
           if (state is LoginSuccess) {
             showSnack(
               SnackBar(
-                content: const Text('Welcome back! 🎉'),
+                content: Text('Welcome back! 🎉'.tr),
                 backgroundColor: Colors.green.shade600,
                 behavior: SnackBarBehavior.fixed,
                 shape: RoundedRectangleBorder(
@@ -87,6 +89,19 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () =>
+                              LanguageController.showPicker(context),
+                          icon: const Icon(Icons.language),
+                          label: Text(
+                            LanguageController.names[LanguageController
+                                .locale
+                                .languageCode]!,
+                          ),
+                        ),
+                      ),
                       // App Logo Header
                       Center(
                         child: Container(
@@ -107,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       // Title & Subtitle
                       Text(
-                        'Welcome Back',
+                        'Welcome Back'.tr,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -116,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Sign in to continue your conversations',
+                        'Sign in to continue your conversations'.tr,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.grey.shade600,
@@ -129,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Email Address',
+                          labelText: 'Email Address'.tr,
                           hintText: 'example@domain.com',
                           prefixIcon: const Icon(Icons.email_outlined),
                           border: OutlineInputBorder(
@@ -149,8 +164,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: 'Enter your password',
+                          labelText: 'Password'.tr,
+                          hintText: 'Enter your password'.tr,
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -210,8 +225,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     strokeWidth: 2.5,
                                   ),
                                 )
-                              : const Text(
-                                  'Sign In',
+                              : Text(
+                                  'Sign In'.tr,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -225,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Don't have an account? ",
+                            "Don't have an account? ".tr,
                             style: TextStyle(color: Colors.grey.shade600),
                           ),
                           GestureDetector(
@@ -238,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                             },
                             child: Text(
-                              'Create Account',
+                              'Create Account'.tr,
                               style: TextStyle(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold,

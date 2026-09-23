@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:chat_app/feature/message/presentation/widget/voice_message_recorder.dart';
+import 'package:chat_app/feature/message/presentation/widget/voice_message_player.dart';
 import 'package:chat_app/feature/message/data/datasource/read_receipt_datasource.dart';
 import 'package:chat_app/feature/message/presentation/widget/read_receipt_avatar.dart';
 import 'take_photo_screen.dart';
 import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
 import 'package:chat_app/feature/group/domain/entity/group_entity.dart';
 import 'package:chat_app/core/widget/profile_avatar_image.dart';
-
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
@@ -52,6 +53,7 @@ class _ConversationScreenState extends State<ConversationScreen>
   final _messageViewportKey = GlobalKey();
   final Map<int, GlobalKey> _messageKeys = {};
   Timer? _receiptTimer;
+  StreamSubscription<CallState>? _voiceCallSubscription;
   int _recipientReadId = 0;
   int _markedReadId = 0;
   bool _loadingReceipts = false;
@@ -108,7 +110,8 @@ class _ConversationScreenState extends State<ConversationScreen>
     _markingRead = true;
     try {
       await sl<ReadReceiptDataSource>().markRead(
-        widget.conversationId, visibleId,
+        widget.conversationId,
+        visibleId,
       );
       _markedReadId = visibleId;
     } catch (_) {
@@ -131,6 +134,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       unawaited(_refreshReceipts());
     }
   }
+
   final _composer = TextEditingController();
   final _scrollController = ScrollController();
   final Set<int> _seenMessageIds = {};
@@ -157,6 +161,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     final photo = profileAvatarImage(
       _headerGroup?.avatarUrl ?? widget.avatarUrl,
     );
+
     final members = _headerGroup?.members ?? const <GroupMemberEntity>[];
     if (widget.isGroup && photo == null && members.isNotEmpty) {
       return SizedBox(
@@ -223,6 +228,9 @@ class _ConversationScreenState extends State<ConversationScreen>
     _messageBloc = sl<MessageBloc>()
       ..add(MessageLoadRequested(conversationId: widget.conversationId));
     _callBloc = sl<CallBloc>();
+    _voiceCallSubscription = _callBloc.stream.listen((state) {
+      if (state is! CallIdle) unawaited(VoiceMessagePlayer.pauseActive());
+    });
     if (widget.isGroup) _loadGroupAvatar();
     sl<TokenStorage>().getUserId().then((id) {
       if (mounted) setState(() => _currentUserId = id);
@@ -232,7 +240,9 @@ class _ConversationScreenState extends State<ConversationScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(VoiceMessagePlayer.pauseActive());
     _receiptTimer?.cancel();
+    _voiceCallSubscription?.cancel();
     _composer.dispose();
     _scrollController.dispose();
 
@@ -255,6 +265,35 @@ class _ConversationScreenState extends State<ConversationScreen>
     setState(() => _pendingImage = null);
   }
 
+  Future<void> _recordVoiceMessage() async {
+    if (_callBloc.state is! CallIdle) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Finish the current call first.'.tr)),
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    await VoiceMessagePlayer.pauseActive();
+    if (!mounted) return;
+    final message = await showModalBottomSheet<MessageEntity>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (_) => VoiceMessageRecorder(
+        canRecord: () => _callBloc.state is CallIdle,
+        send: (file, seconds) => sl<MessageDataSource>().sendVoiceMessage(
+          conversationId: widget.conversationId,
+          audioFile: file,
+          durationSeconds: seconds,
+        ),
+      ),
+    );
+    if (!mounted || message == null) return;
+    _messageBloc.add(MessageConfirmed(message));
+    _scrollToLatest(jump: false);
+  }
+
   File? _pendingImage;
   bool _pickingImage = false;
 
@@ -269,10 +308,10 @@ class _ConversationScreenState extends State<ConversationScreen>
         if (!permission.isGranted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Allow camera access to take a photo.'),
+              content: Text('Allow camera access to take a photo.'.tr),
               action: permission.isPermanentlyDenied
                   ? SnackBarAction(
-                      label: 'Settings',
+                      label: 'Settings'.tr,
                       onPressed: () {
                         openAppSettings();
                       },
@@ -315,9 +354,11 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Future<void> _startCall({bool isVideo = true}) async {
+    await VoiceMessagePlayer.pauseActive();
+    if (!mounted) return;
     if (_callBloc.state is! CallIdle) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Finish the current call first.')),
+        SnackBar(content: Text('Finish the current call first.'.tr)),
       );
       return;
     }
@@ -335,7 +376,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         if (!mounted || _callBloc.state is! CallIdle) return;
         if (members.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Add another member before calling.')),
+            SnackBar(content: Text('Add another member before calling.'.tr)),
           );
           return;
         }
@@ -387,7 +428,7 @@ class _ConversationScreenState extends State<ConversationScreen>
           Navigator.of(sheetContext).pop();
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Message copied')));
+          ).showSnackBar(SnackBar(content: Text('Message copied'.tr)));
         },
         onReplay: () {
           _composer.text = message.content;
@@ -396,7 +437,7 @@ class _ConversationScreenState extends State<ConversationScreen>
         onForward: () {
           Navigator.of(sheetContext).pop();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Forwarding will be available soon.')),
+            SnackBar(content: Text('Forwarding will be available soon.'.tr)),
           );
         },
         onDelete:
@@ -414,18 +455,18 @@ class _ConversationScreenState extends State<ConversationScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete message?'),
+        title: Text('Delete message?'.tr),
         content: const Text(
           'Your message will be replaced with "Unsend Message" for everyone.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            child: Text('Delete'.tr),
           ),
         ],
       ),
@@ -624,12 +665,14 @@ class _ConversationScreenState extends State<ConversationScreen>
                   final seenMessageId = widget.isGroup
                       ? null
                       : latestSeenMessageId(
-                          messages, widget.participantId, _recipientReadId,
+                          messages,
+                          widget.participantId,
+                          _recipientReadId,
                         );
                   _scheduleReadCheck();
                   if (messages.isEmpty)
-                    return const Center(
-                      child: Text('Say hello to start the conversation.'),
+                    return Center(
+                      child: Text('Say hello to start the conversation.'.tr),
                     );
                   return ListView.builder(
                     controller: _scrollController,
@@ -673,7 +716,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                       );
                       return Column(
                         key: _messageKeys.putIfAbsent(
-                          message.id, () => GlobalKey(),
+                          message.id,
+                          () => GlobalKey(),
                         ),
                         children: [
                           if (startsDay)
@@ -745,7 +789,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                     Row(
                       children: [
                         Icon(Icons.add, color: scheme.onSurfaceVariant),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 4),
                         GestureDetector(
                           onTap: _pickingImage ? null : () => _pickImage(),
                           child: Icon(
@@ -753,9 +797,14 @@ class _ConversationScreenState extends State<ConversationScreen>
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 4),
                         IconButton(
-                          tooltip: 'Take photo',
+                          tooltip: 'Take photo'.tr,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 40,
+                          ),
                           onPressed: _pickingImage
                               ? null
                               : () => _pickImage(source: ImageSource.camera),
@@ -764,9 +813,22 @@ class _ConversationScreenState extends State<ConversationScreen>
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Icon(Icons.mic_none, color: scheme.onSurfaceVariant),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          tooltip: 'Voice message'.tr,
+                          onPressed: _recordVoiceMessage,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 40,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            Icons.mic_none,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: TextField(
                             controller: _composer,
@@ -774,8 +836,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                             onSubmitted: (_) => _send(),
                             decoration: InputDecoration(
                               hintText: _pendingImage != null
-                                  ? 'Add a caption'
-                                  : 'Message',
+                                  ? 'Add a caption'.tr
+                                  : 'Message'.tr,
                               filled: true,
                               fillColor: scheme.surfaceContainerHigh,
                               suffixIcon: const Icon(
@@ -788,8 +850,13 @@ class _ConversationScreenState extends State<ConversationScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 4),
                         IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
                           icon: const Icon(
                             Icons.send_rounded,
                             color: Color(0xFF34C471),
@@ -846,7 +913,10 @@ class _MessageBubble extends StatelessWidget {
     final hasImage =
         (message.imageUrl?.isNotEmpty ?? false) ||
         (message.localImagePath?.isNotEmpty ?? false);
-
+    final voiceUrl =
+        message.audioUrl ??
+        message.metadata?['audio_url']?.toString() ??
+        message.metadata?['file_url']?.toString();
     return Align(
       alignment: sentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
@@ -886,6 +956,24 @@ class _MessageBubble extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    //  if (message.isAudio && message.audioUrl != null)
+                    //     VoiceMessagePlayer(
+                    //       key: ValueKey(message.audioUrl),
+                    //       source: message.audioUrl!,
+                    //       durationSeconds: int.tryParse('${message.metadata?['duration_seconds']}') ?? 0,
+                    //       color: textColor,
+                    //     ),
+                    if (message.isAudio && voiceUrl != null)
+                      VoiceMessagePlayer(
+                        key: ValueKey(voiceUrl),
+                        source: voiceUrl,
+                        durationSeconds:
+                            int.tryParse(
+                              '${message.metadata?['duration_seconds']}',
+                            ) ??
+                            0,
+                        color: textColor,
+                      ),
                     if (hasImage)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(14),
@@ -921,7 +1009,7 @@ class _MessageBubble extends StatelessWidget {
                                 ),
                               ),
                       ),
-                    if (message.displayContent.isNotEmpty)
+                    if (!message.isAudio && message.displayContent.isNotEmpty)
                       Padding(
                         padding: hasImage
                             ? const EdgeInsets.fromLTRB(8, 6, 8, 4)
@@ -945,7 +1033,10 @@ class _MessageBubble extends StatelessWidget {
               children: [
                 Text(
                   time,
-                  style: const TextStyle(color: Color(0xFF9DA1A7), fontSize: 11),
+                  style: const TextStyle(
+                    color: Color(0xFF9DA1A7),
+                    fontSize: 11,
+                  ),
                 ),
                 if (readReceipt != null) ...[
                   const SizedBox(width: 6),
@@ -1003,13 +1094,13 @@ class _CallLogBubble extends StatelessWidget {
       case 'declined':
         icon = Icons.call_missed_rounded;
         iconColor = const Color(0xFFE0433C);
-        label = isGroupCall ? 'Missed group call' : 'Missed call';
+        label = isGroupCall ? 'Missed group call'.tr : 'Missed call'.tr;
         break;
       case 'ended':
       default:
         icon = isVideo ? Icons.videocam_rounded : Icons.call_rounded;
         iconColor = const Color(0xFF6E7178);
-        final callName = isGroupCall ? 'Group call' : 'Call';
+        final callName = isGroupCall ? 'Group call'.tr : 'Call'.tr;
         label = (duration != null && duration > 0)
             ? '$callName · ${_formatDuration(duration)}'
             : '$callName ended';
@@ -1128,10 +1219,10 @@ class _MessageActionSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'React',
+                'React'.tr,
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
@@ -1151,20 +1242,24 @@ class _MessageActionSheet extends StatelessWidget {
                     ..add(const _ReactionButton(icon: Icons.add_rounded)),
             ),
             const SizedBox(height: 10),
-            _ActionRow(label: 'Copy', icon: Icons.copy_outlined, onTap: onCopy),
+            _ActionRow(
+              label: 'Copy'.tr,
+              icon: Icons.copy_outlined,
+              onTap: onCopy,
+            ),
             _ActionRow(
               label: 'Replay',
               icon: Icons.reply_rounded,
               onTap: onReplay,
             ),
             _ActionRow(
-              label: 'Forward',
+              label: 'Forward'.tr,
               icon: Icons.forward_rounded,
               onTap: onForward,
             ),
             if (onDelete != null)
               _ActionRow(
-                label: 'Delete',
+                label: 'Delete'.tr,
                 icon: Icons.delete_outline_rounded,
                 onTap: onDelete!,
                 isLast: true,
@@ -1187,7 +1282,7 @@ class _ReactionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reactions will be available soon.')),
+        SnackBar(content: Text('Reactions will be available soon.'.tr)),
       ),
       borderRadius: BorderRadius.circular(20),
       child: SizedBox(

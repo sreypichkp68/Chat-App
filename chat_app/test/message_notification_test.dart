@@ -31,6 +31,7 @@ void main() {
       await listener.receive(jsonEncode(message(1)));
       await listener.receive(message(1));
       await listener.receive(message(2, type: 'image'));
+      await listener.receive(message(7, type: 'audio'));
       await listener.receive(message(3, sender: 2));
       await listener.receive(message(4, type: 'call_log'));
       background = false;
@@ -40,10 +41,14 @@ void main() {
         message(5),
       ); // No delayed duplicate after resuming.
       await listener.receive({'message': {}});
-      expect(shown, ['7:Sok:Hello', '7:Sok:Sent you a photo']);
+      expect(shown, [
+        '7:Sok:Hello',
+        '7:Sok:Sent you a photo',
+        '7:Sok:Sent you a voice message',
+      ]);
       await listener.dispose();
       await listener.receive(message(6));
-      expect(shown, hasLength(2));
+      expect(shown, hasLength(3));
     },
   );
 }

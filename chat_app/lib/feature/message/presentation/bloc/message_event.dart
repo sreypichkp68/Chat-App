@@ -1,4 +1,11 @@
 import 'dart:io';
+import 'package:chat_app/feature/message/domain/entity/message_entity.dart';
+
+/// A completed media upload, merged with any earlier socket delivery.
+class MessageConfirmed extends MessageEvent {
+  final MessageEntity message;
+  MessageConfirmed(this.message);
+}
 
 abstract class MessageEvent {}
 

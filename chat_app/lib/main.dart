@@ -1,3 +1,6 @@
+import 'package:chat_app/core/localization/app_translations.dart';
+import 'package:chat_app/core/localization/language_controller.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:async';
 
 import 'package:chat_app/core/service/injection_container.dart';
@@ -12,11 +15,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
+
 void main() async {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       await ThemeController.initialize();
+      await LanguageController.initialize();
       //when use server docker need it
       await dotenv.load(fileName: ".env");
       await NotificationService.instance.initialize();
@@ -46,10 +51,18 @@ class MyApp extends StatelessWidget {
         // CallBloc is intentionally NOT provided here — it doesn't exist
         // until after login. See AuthGate's _AuthenticatedShell.
       ],
-      child: ValueListenableBuilder<ThemeMode>(
-        valueListenable: ThemeController.mode,
-        builder: (context, mode, _) => GetMaterialApp(
+      child: ListenableBuilder(
+        listenable: Listenable.merge([
+          ThemeController.mode,
+          LanguageController.currentLocale,
+        ]),
+        builder: (context, _) => GetMaterialApp(
           debugShowCheckedModeBanner: false,
+          translations: AppTranslations(),
+          locale: LanguageController.locale,
+          fallbackLocale: const Locale('en'),
+          supportedLocales: LanguageController.supportedLocales,
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
           theme: ThemeData(
             brightness: Brightness.light,
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
@@ -61,7 +74,7 @@ class MyApp extends StatelessWidget {
               brightness: Brightness.dark,
             ),
           ),
-          themeMode: mode,
+          themeMode: ThemeController.mode.value,
           home: const AuthGate(),
         ),
       ),

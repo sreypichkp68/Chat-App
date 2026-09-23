@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/feature/friends/data/datasource/friend_request_remote_datasource.dart';
 import 'package:chat_app/feature/message/domain/usecase/open_direct_conversation_usecase.dart';
@@ -35,9 +36,9 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         _requests = _loadRequests();
       });
       if (status != 'accepted') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Request declined')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Request declined'.tr)));
         return;
       }
 
@@ -45,23 +46,27 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
         participantId: request.senderId,
       );
       if (!mounted) return;
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ConversationScreen(
-          conversationId: conversationId,
-          participantId: request.senderId,
-          participantName: request.senderName,
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ConversationScreen(
+            conversationId: conversationId,
+            participantId: request.senderId,
+            participantName: request.senderName,
+          ),
         ),
-      ));
+      );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$error')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Friend Requests')),
+      appBar: AppBar(title: Text('Friend Requests'.tr)),
       body: FutureBuilder<List<IncomingFriendRequest>>(
         future: _requests,
         builder: (context, snapshot) {
@@ -69,11 +74,13 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Could not load requests: ${snapshot.error}'));
+            return Center(
+              child: Text('Could not load requests: ${snapshot.error}'),
+            );
           }
           final requests = snapshot.data ?? const [];
           if (requests.isEmpty) {
-            return const Center(child: Text('No pending friend requests'));
+            return Center(child: Text('No pending friend requests'.tr));
           }
           return ListView.separated(
             padding: const EdgeInsets.all(16),
@@ -95,12 +102,12 @@ class _FriendRequestsScreenState extends State<FriendRequestsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Decline',
+                      tooltip: 'Decline'.tr,
                       icon: const Icon(Icons.close, color: Colors.red),
                       onPressed: () => _respond(request, 'declined'),
                     ),
                     IconButton(
-                      tooltip: 'Accept',
+                      tooltip: 'Accept'.tr,
                       icon: const Icon(Icons.check, color: Colors.green),
                       onPressed: () => _respond(request, 'accepted'),
                     ),

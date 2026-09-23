@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/feature/auth/presentation/bloc/register_event.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -44,7 +45,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (state is RegisterSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text('Account created successfully! 🎉'),
+                content: Text('Account created successfully! 🎉'.tr),
                 backgroundColor: Colors.green.shade600,
                 behavior: SnackBarBehavior.floating,
                 shape: RoundedRectangleBorder(
@@ -98,7 +99,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                       // Title & Subtitle
                       Text(
-                        'Get Started',
+                        'Get Started'.tr,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
@@ -107,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Create an account to start chatting with friends',
+                        'Create an account to start chatting with friends'.tr,
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: Colors.grey.shade600,
@@ -119,8 +120,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _nameController,
                         decoration: InputDecoration(
-                          labelText: 'Full Name',
-                          hintText: 'Enter your full name',
+                          labelText: 'Full Name'.tr,
+                          hintText: 'Enter your full name'.tr,
                           prefixIcon: const Icon(Icons.person_outline),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -139,7 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Email Address',
+                          labelText: 'Email Address'.tr,
                           hintText: 'example@domain.com',
                           prefixIcon: const Icon(Icons.email_outlined),
                           border: OutlineInputBorder(
@@ -159,8 +160,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _passwordController,
                         obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: 'At least 6 characters',
+                          labelText: 'Password'.tr,
+                          hintText: 'At least 6 characters'.tr,
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -191,8 +192,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
-                          labelText: 'Confirm Password',
-                          hintText: 'Re-enter your password',
+                          labelText: 'Confirm Password'.tr,
+                          hintText: 'Re-enter your password'.tr,
                           prefixIcon: const Icon(Icons.lock_reset_outlined),
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -217,10 +218,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please confirm your password';
+                            return 'Please confirm your password'.tr;
                           }
                           if (value != _passwordController.text) {
-                            return 'Passwords do not match';
+                            return 'Passwords do not match'.tr;
                           }
                           return null;
                         },
@@ -264,8 +265,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     strokeWidth: 2.5,
                                   ),
                                 )
-                              : const Text(
-                                  'Create Account',
+                              : Text(
+                                  'Create Account'.tr,
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -280,7 +281,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'Already have an account? ',
+                            'Already have an account? '.tr,
                             style: TextStyle(color: Colors.grey.shade600),
                           ),
                           GestureDetector(
@@ -292,7 +293,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               );
                             },
                             child: Text(
-                              'Sign In',
+                              'Sign In'.tr,
                               style: TextStyle(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold,

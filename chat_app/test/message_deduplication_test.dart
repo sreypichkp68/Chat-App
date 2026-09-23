@@ -41,6 +41,38 @@ class _MessageRepo implements MessageRepo {
 }
 
 void main() {
+  test('confirmed voice upload merges with earlier socket delivery', () async {
+    final repo = _MessageRepo();
+    final bloc = MessageBloc(
+      getMessagesUsecase: GetMessagesUsecase(repo),
+      sendMessageUsecase: SendMessageUsecase(repo),
+      connectSocketUsecase: ConnectMessageUsecase(repo),
+    );
+    addTearDown(() async {
+      await bloc.close();
+      await repo.socket.close();
+    });
+    bloc.add(MessageLoadRequested(conversationId: 1));
+    await bloc.stream.firstWhere((state) => state is MessageLoaded);
+    final voice = MessageEntity(
+      id: 99,
+      conversationId: 1,
+      senderId: 1,
+      content: '',
+      messageType: 'audio',
+      metadata: {'audio_url': 'https://example.com/a.m4a'},
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    repo.socket.add(voice);
+    await bloc.stream.firstWhere(
+      (state) => state is MessageLoaded && state.messages.isNotEmpty,
+    );
+    final confirmed = bloc.stream.firstWhere((state) => state is MessageLoaded);
+    bloc.add(MessageConfirmed(voice));
+    final state = await confirmed as MessageLoaded;
+    expect(state.messages.map((message) => message.id), [99]);
+  });
   test('socket delivery before send response leaves one message', () async {
     final repo = _MessageRepo();
     final bloc = MessageBloc(

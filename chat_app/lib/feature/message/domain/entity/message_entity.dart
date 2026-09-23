@@ -24,8 +24,16 @@ class MessageEntity {
   });
 
   bool get isImage => messageType == 'image';
-  String get displayContent =>
-      content.trim().isNotEmpty ? content : (isImage ? 'Image' : '');
+  bool get isAudio => messageType == 'audio';
+  String? get audioUrl =>
+      (metadata?['audio_url'] ?? metadata?['file_url']) as String?;
+  String get displayContent => content.trim().isNotEmpty
+      ? content
+      : (isImage
+            ? 'Image'
+            : isAudio
+            ? 'Voice message'
+            : '');
   String? get imageUrl => metadata?['imageUrl'] as String?;
   String? get localImagePath => metadata?['localPath'] as String?;
 

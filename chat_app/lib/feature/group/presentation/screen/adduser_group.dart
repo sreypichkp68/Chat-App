@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/feature/message/presentation/screen/conversation_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -80,7 +81,7 @@ class _AdduserGroupState extends State<AdduserGroup> {
         appBar: AppBar(
           backgroundColor: const Color(0xFF1E1E1E),
           foregroundColor: Colors.white,
-          title: const Text('New group'),
+          title: Text('New group'.tr),
           actions: [
             TextButton(
               onPressed: _selectedUsers.isEmpty || creating
@@ -114,7 +115,7 @@ class _AdduserGroupState extends State<AdduserGroup> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Create'),
+                  : Text('Create'.tr),
             ),
           ],
         ),
@@ -127,8 +128,8 @@ class _AdduserGroupState extends State<AdduserGroup> {
               child: TextField(
                 controller: _groupNameController,
                 style: const TextStyle(color: Colors.white),
-                decoration: const InputDecoration(
-                  hintText: 'Group name (optional)',
+                decoration: InputDecoration(
+                  hintText: 'Group name (optional)'.tr,
                   hintStyle: TextStyle(color: Colors.grey, fontSize: 16),
                   border: InputBorder.none,
                 ),
@@ -151,9 +152,9 @@ class _AdduserGroupState extends State<AdduserGroup> {
                       SearchQueryChanged(query),
                     );
                   },
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     prefixIcon: Icon(Icons.search, color: Colors.grey),
-                    hintText: 'Search',
+                    hintText: 'Search'.tr,
                     hintStyle: TextStyle(color: Colors.grey, fontSize: 16),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: 10),
@@ -248,9 +249,9 @@ class _AdduserGroupState extends State<AdduserGroup> {
 
                   if (state is SearchUsersLoaded) {
                     if (state.results.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Text(
-                          'No users found',
+                          'No users found'.tr,
                           style: TextStyle(color: Colors.grey),
                         ),
                       );

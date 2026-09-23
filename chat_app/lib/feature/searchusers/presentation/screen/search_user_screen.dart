@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/feature/message/presentation/widget/chat_color.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user.state.dart';
 import 'package:chat_app/feature/searchusers/presentation/bloc/search_user_bloc.dart';
@@ -22,7 +23,7 @@ class SearchUserScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: background,
         elevation: 0,
-        title: const Text('New Chat'),
+        title: Text('New Chat'.tr),
       ),
       body: SafeArea(
         child: Column(
@@ -33,7 +34,7 @@ class SearchUserScreen extends StatelessWidget {
                 autofocus: true,
                 style: ChatType.body.copyWith(color: scheme.onSurface),
                 decoration: InputDecoration(
-                  hintText: 'Search by name or email',
+                  hintText: 'Search by name or email'.tr,
                   hintStyle: ChatType.body.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
@@ -56,8 +57,8 @@ class SearchUserScreen extends StatelessWidget {
               child: BlocBuilder<SearchUsersBloc, SearchUsersState>(
                 builder: (context, state) {
                   return switch (state) {
-                    SearchUsersInitial() => const Center(
-                      child: Text('Search for someone to start chatting'),
+                    SearchUsersInitial() => Center(
+                      child: Text('Search for someone to start chatting'.tr),
                     ),
                     SearchUsersLoading() => const Center(
                       child: CircularProgressIndicator(),
@@ -67,7 +68,7 @@ class SearchUserScreen extends StatelessWidget {
                     ),
                     SearchUsersLoaded(:final results) =>
                       results.isEmpty
-                          ? const Center(child: Text('No users found'))
+                          ? Center(child: Text('No users found'.tr))
                           : ListView.separated(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,

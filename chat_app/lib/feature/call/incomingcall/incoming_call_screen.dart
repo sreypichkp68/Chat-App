@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call_event.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call_state.dart';
@@ -69,8 +70,11 @@ class IncomingCallScreen extends StatelessWidget {
                 Text(
                   state is CallIncomingRinging && state.session.groupId != null
                       ? 'Incoming group ${state.session.isVideo ? 'video' : 'voice'} call'
-                      : 'Incoming voice call',
-                  style: const TextStyle(color: Color(0xFFAEB2B8), fontSize: 15),
+                      : 'Incoming voice call'.tr,
+                  style: const TextStyle(
+                    color: Color(0xFFAEB2B8),
+                    fontSize: 15,
+                  ),
                 ),
                 const Spacer(),
                 Padding(
@@ -84,14 +88,14 @@ class IncomingCallScreen extends StatelessWidget {
                       _CallActionButton(
                         color: const Color(0xFFE0473A),
                         icon: Icons.call_end_rounded,
-                        label: 'Decline',
+                        label: 'Decline'.tr,
                         onTap: () =>
                             context.read<CallBloc>().add(const CallDeclined()),
                       ),
                       _CallActionButton(
                         color: const Color(0xFF34C471),
                         icon: Icons.call_rounded,
-                        label: 'Accept',
+                        label: 'Accept'.tr,
                         onTap: () =>
                             context.read<CallBloc>().add(const CallAccepted()),
                       ),

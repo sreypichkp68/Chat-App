@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'dart:typed_data';
 
 import 'package:chat_app/core/constants/api_entpoint.dart';
@@ -109,7 +110,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Edit Profile')),
+        appBar: AppBar(title: Text('Edit Profile'.tr)),
         body: profile == null
             ? Center(
                 child: _error == null
@@ -118,10 +119,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(_error!, textAlign: TextAlign.center),
-                          TextButton(
-                            onPressed: _load,
-                            child: const Text('Retry'),
-                          ),
+                          TextButton(onPressed: _load, child: Text('Retry'.tr)),
                         ],
                       ),
               )
@@ -154,7 +152,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       onPressed: _saving || _picking ? null : _pickPhoto,
                       icon: const Icon(Icons.photo_camera_outlined),
                       label: Text(
-                        _picking ? 'Loading photo...' : 'Change photo',
+                        _picking ? 'Loading photo...' : 'Change photo'.tr,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -163,8 +161,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       enabled: !_saving,
                       maxLength: 255,
                       textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
+                      decoration: InputDecoration(
+                        labelText: 'Name'.tr,
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) => (value ?? '').trim().isEmpty
@@ -177,8 +175,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       enabled: !_saving,
                       maxLength: 255,
                       maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'About / status',
+                      decoration: InputDecoration(
+                        labelText: 'About / status'.tr,
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -186,15 +184,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     TextFormField(
                       initialValue: profile.email,
                       readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Email',
+                      decoration: InputDecoration(
+                        labelText: 'Email'.tr,
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
                       onPressed: _saving || _picking ? null : _save,
-                      child: Text(_saving ? 'Saving...' : 'Save changes'),
+                      child: Text(_saving ? 'Saving...'.tr : 'Save changes'.tr),
                     ),
                   ],
                 ),

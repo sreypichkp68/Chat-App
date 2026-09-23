@@ -99,11 +99,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   String _dayLabel(BuildContext context, DateTime? day, DateTime now) {
-    if (day == null) return 'No messages yet';
+    if (day == null) return 'No messages yet'.tr;
     final today = DateTime(now.year, now.month, now.day);
-    if (day == today) return 'Today';
+    if (day == today) return 'Today'.tr;
     if (day == DateTime(now.year, now.month, now.day - 1)) {
-      return 'Yesterday';
+      return 'Yesterday'.tr;
     }
     return MaterialLocalizations.of(context).formatMediumDate(day);
   }
@@ -223,7 +223,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Remove chat?'),
+        title: Text('Remove chat?'.tr),
         content: Text(
           'Remove the chat with ${conversation.participantName} from your list? '
           'Your contact and messages are kept. You can chat again anytime.',
@@ -231,11 +231,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text('Cancel'.tr),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
+            child: Text('Remove'.tr),
           ),
         ],
       ),
@@ -313,7 +313,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Chats',
+                    'Chats'.tr,
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
@@ -323,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   Row(
                     children: [
                       IconButton(
-                        tooltip: 'Friend requests',
+                        tooltip: 'Friend requests'.tr,
                         onPressed: () async {
                           await Navigator.of(context).push(
                             MaterialPageRoute(
@@ -409,7 +409,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 controller: _searchController,
                 style: TextStyle(fontSize: 15, color: scheme.onSurface),
                 decoration: InputDecoration(
-                  hintText: 'Search',
+                  hintText: 'Search'.tr,
                   hintStyle: const TextStyle(color: _inkFaint, fontSize: 15),
                   prefixIcon: const Icon(
                     Icons.search,
@@ -589,7 +589,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   }
                   if (state is SearchUsersLoaded) {
                     if (state.results.isEmpty) {
-                      return const Center(child: Text('No users found'));
+                      return Center(child: Text('No users found'.tr));
                     }
                     return ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -654,7 +654,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No Contacts',
+              'No Contacts'.tr,
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w600,

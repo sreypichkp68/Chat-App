@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -102,9 +103,7 @@ class _TakePhotoScreenState extends State<TakePhotoScreen>
     } catch (_) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not take photo. Please try again.'),
-          ),
+          SnackBar(content: Text('Could not take photo. Please try again.'.tr)),
         );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -132,14 +131,14 @@ class _TakePhotoScreenState extends State<TakePhotoScreen>
         leading: TextButton.icon(
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.arrow_back),
-          label: const Text('Back'),
+          label: Text('Back'.tr),
           style: TextButton.styleFrom(foregroundColor: Colors.white),
         ),
-        title: const Text('Take photo'),
+        title: Text('Take photo'.tr),
         actions: [
           if (_cameras.length > 1)
             IconButton(
-              tooltip: 'Switch camera',
+              tooltip: 'Switch camera'.tr,
               onPressed: _busy || _opening
                   ? null
                   : () {
@@ -165,7 +164,7 @@ class _TakePhotoScreenState extends State<TakePhotoScreen>
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white),
                     ),
-                    TextButton(onPressed: _open, child: const Text('Retry')),
+                    TextButton(onPressed: _open, child: Text('Retry'.tr)),
                   ],
                 ),
               ),
@@ -176,7 +175,7 @@ class _TakePhotoScreenState extends State<TakePhotoScreen>
           child: FilledButton.icon(
             onPressed: controller == null || _busy ? null : _take,
             icon: const Icon(Icons.camera_alt),
-            label: Text(_busy ? 'Taking photo...' : 'Take photo'),
+            label: Text(_busy ? 'Taking photo...'.tr : 'Take photo'.tr),
           ),
         ),
       ),

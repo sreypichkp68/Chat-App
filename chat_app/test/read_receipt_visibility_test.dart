@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:chat_app/core/service/injection_container.dart';
 import 'package:chat_app/core/service/token_storage.dart';
 import 'package:chat_app/feature/call/presentation/bloc/call.bloc.dart';
+import 'package:chat_app/feature/call/presentation/bloc/call_state.dart';
 import 'package:chat_app/feature/message/data/datasource/read_receipt_datasource.dart';
 import 'package:chat_app/feature/message/domain/entity/message_entity.dart';
 import 'package:chat_app/feature/message/domain/reposity/message_repo.dart';
@@ -15,7 +16,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 
-class _Calls extends Fake implements CallBloc {}
+class _Calls extends Fake implements CallBloc {
+  @override
+  Stream<CallState> get stream => const Stream.empty();
+}
 
 class _Storage extends Fake implements TokenStorage {
   @override

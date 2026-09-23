@@ -34,6 +34,12 @@ class MessageBloc extends Bloc<MessageEvent, MessageState> {
     on<MessageLoadRequested>(_onLoadRequested);
     on<MessageSendRequested>(_onSendRequested);
     on<_MessageReceived>(_onMessageReceived);
+    on<MessageConfirmed>((event, emit) {
+      _messages.removeWhere((message) => message.id == event.message.id);
+      _messages.add(event.message);
+      _messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      emit(MessageLoaded(List.of(_messages)));
+    });
     on<_MessagesRefreshRequested>(_onMessagesRefreshRequested);
   }
   Future<void> _onLoadRequested(

@@ -46,7 +46,7 @@ class MessageNotificationListener {
     if (id == null ||
         conversationId == null ||
         '${message['sender_id']}' == userId ||
-        (type != 'text' && type != 'image') ||
+        (type != 'text' && type != 'image' && type != 'audio') ||
         !_seen.add(id)) {
       return;
     }
@@ -58,7 +58,11 @@ class MessageNotificationListener {
     await show(
       conversationId,
       name == null || name.isEmpty ? 'New message' : name,
-      type == 'image' ? 'Sent you a photo' : content,
+      type == 'image'
+          ? 'Sent you a photo'
+          : type == 'audio'
+          ? 'Sent you a voice message'
+          : content,
     );
   }
 

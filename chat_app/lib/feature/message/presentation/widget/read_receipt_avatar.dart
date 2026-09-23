@@ -12,7 +12,9 @@ int? latestSeenMessageId(
     if (message.id > 0 &&
         message.id <= lastReadMessageId &&
         message.senderId.toString() != recipientId &&
-        (message.messageType == 'text' || message.messageType == 'image') &&
+        (message.messageType == 'text' ||
+            message.messageType == 'image' ||
+            message.isAudio) &&
         message.metadata?['is_unsent'] != true &&
         (latest == null || message.id > latest)) {
       latest = message.id;

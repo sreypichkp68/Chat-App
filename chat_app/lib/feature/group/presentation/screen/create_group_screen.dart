@@ -1,3 +1,4 @@
+import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/group_bloc.dart';
@@ -30,15 +31,15 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   void _submitGroup() {
     if (_titleController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a group title')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Please enter a group title'.tr)));
       return;
     }
 
     if (_selectedUserIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one member')),
+        SnackBar(content: Text('Please select at least one member'.tr)),
       );
       return;
     }
@@ -54,7 +55,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New Group')),
+      appBar: AppBar(title: Text('New Group'.tr)),
       body: BlocConsumer<GroupBloc, GroupState>(
         listener: (context, state) {
           if (state is GroupSuccess) {
@@ -79,8 +80,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               children: [
                 TextField(
                   controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Group Name',
+                  decoration: InputDecoration(
+                    labelText: 'Group Name'.tr,
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -110,7 +111,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                 ),
                 ElevatedButton(
                   onPressed: _submitGroup,
-                  child: const Text('Create Group'),
+                  child: Text('Create Group'.tr),
                 ),
               ],
             ),
