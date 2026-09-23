@@ -305,7 +305,9 @@ class _CallHistoryScreenState extends State<CallHistoryScreen> {
 
   Future<void> _refresh() async {
     final next = _loadHistory();
-    setState(() => _history = next);
+    setState(() {
+      _history = next;
+    });
     try {
       await next;
     } catch (_) {

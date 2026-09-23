@@ -26,6 +26,7 @@ import 'package:chat_app/feature/group/domain/repository/group_repository.dart';
 import 'package:chat_app/feature/group/domain/usercase/create_group_usecase.dart';
 import 'package:chat_app/feature/group/presentation/bloc/group_bloc.dart';
 import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
+import 'package:chat_app/feature/message/data/datasource/read_receipt_datasource.dart';
 import 'package:chat_app/feature/message/data/datasource/message_socket_datasource.dart';
 import 'package:chat_app/feature/message/data/repositoryImpl/message_repo_impl.dart';
 import 'package:chat_app/feature/message/domain/reposity/message_repo.dart';
@@ -72,6 +73,9 @@ void initDependencies() {
 
   sl.registerLazySingleton<MessageDataSource>(
     () => MessageDataSourceImpl(client: sl(), tokenStorage: sl()),
+  );
+  sl.registerLazySingleton(
+    () => ReadReceiptDataSource(client: sl(), tokenStorage: sl()),
   );
 
   sl.registerLazySingleton<MessageSocketDataSource>(

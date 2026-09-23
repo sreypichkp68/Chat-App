@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\GroupController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\FriendRequestController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ReadReceiptController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +57,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/conversations/{conversation}', [ConversationController::class, 'destroy']);
     Route::post('/conversations', [ConversationController::class, 'store']);
     // Messages
+    Route::get('/conversations/{conversation}/read-receipts', [ReadReceiptController::class, 'index']);
+    Route::post('/conversations/{conversation}/read-receipts', [ReadReceiptController::class, 'store']);
     Route::get('/conversations/{conversation}/messages', [MessageController::class, 'index']);
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
     Route::put('/messages/{message}', [MessageController::class, 'update']);

@@ -1,3 +1,4 @@
+#for library and dependency
 FROM php:8.3-fpm-alpine
 
 # System dependencies (added nginx + gettext for envsubst)

@@ -1,4 +1,8 @@
+import 'dart:async';
 import 'dart:io';
+import 'package:chat_app/feature/message/data/datasource/read_receipt_datasource.dart';
+import 'package:chat_app/feature/message/presentation/widget/read_receipt_avatar.dart';
+import 'take_photo_screen.dart';
 import 'package:chat_app/feature/message/data/datasource/message_datasource.dart';
 import 'package:chat_app/feature/group/domain/entity/group_entity.dart';
 import 'package:chat_app/core/widget/profile_avatar_image.dart';
@@ -43,7 +47,90 @@ class ConversationScreen extends StatefulWidget {
   State<ConversationScreen> createState() => _ConversationScreenState();
 }
 
-class _ConversationScreenState extends State<ConversationScreen> {
+class _ConversationScreenState extends State<ConversationScreen>
+    with WidgetsBindingObserver {
+  final _messageViewportKey = GlobalKey();
+  final Map<int, GlobalKey> _messageKeys = {};
+  Timer? _receiptTimer;
+  int _recipientReadId = 0;
+  int _markedReadId = 0;
+  bool _loadingReceipts = false;
+  bool _markingRead = false;
+
+  bool get _chatIsVisible =>
+      mounted &&
+      !widget.isGroup &&
+      WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+      ModalRoute.of(context)?.isCurrent == true;
+
+  Future<void> _refreshReceipts() async {
+    if (!_chatIsVisible || _loadingReceipts) return;
+    _loadingReceipts = true;
+    try {
+      final receipts = await sl<ReadReceiptDataSource>().getReceipts(
+        widget.conversationId,
+      );
+      final readId = receipts[widget.participantId] ?? 0;
+      if (mounted && readId > _recipientReadId) {
+        setState(() {
+          _recipientReadId = readId;
+        });
+      }
+    } catch (_) {
+      // Keep the last confirmed receipt and retry on the next tick.
+    } finally {
+      _loadingReceipts = false;
+    }
+  }
+
+  Future<void> _markVisibleMessagesRead() async {
+    if (!_chatIsVisible || _markingRead) return;
+    final viewport = _messageViewportKey.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return;
+    final top = viewport.localToGlobal(Offset.zero).dy;
+    final bottom = top + viewport.size.height;
+    var visibleId = _markedReadId;
+    final state = _messageBloc.state;
+    if (state is! MessageLoaded) return;
+    for (final message in state.messages) {
+      if (message.id <= visibleId ||
+          message.senderId.toString() != widget.participantId) {
+        continue;
+      }
+      final box = _messageKeys[message.id]?.currentContext?.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      final messageBottom = box.localToGlobal(Offset(0, box.size.height)).dy;
+      if (messageBottom > top && messageBottom <= bottom + 1) {
+        visibleId = message.id;
+      }
+    }
+    if (visibleId <= _markedReadId) return;
+    _markingRead = true;
+    try {
+      await sl<ReadReceiptDataSource>().markRead(
+        widget.conversationId, visibleId,
+      );
+      _markedReadId = visibleId;
+    } catch (_) {
+      // Failed acknowledgements are retried; never infer that a send was seen.
+    } finally {
+      _markingRead = false;
+    }
+  }
+
+  void _scheduleReadCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_markVisibleMessagesRead());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _scheduleReadCheck();
+      unawaited(_refreshReceipts());
+    }
+  }
   final _composer = TextEditingController();
   final _scrollController = ScrollController();
   final Set<int> _seenMessageIds = {};
@@ -122,6 +209,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_scheduleReadCheck);
+    if (!widget.isGroup) {
+      _receiptTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        unawaited(_refreshReceipts());
+        unawaited(_markVisibleMessagesRead());
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_refreshReceipts());
+      });
+    }
     _messageBloc = sl<MessageBloc>()
       ..add(MessageLoadRequested(conversationId: widget.conversationId));
     _callBloc = sl<CallBloc>();
@@ -133,6 +231,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _receiptTimer?.cancel();
     _composer.dispose();
     _scrollController.dispose();
 
@@ -183,12 +283,17 @@ class _ConversationScreenState extends State<ConversationScreen> {
           return;
         }
       }
-      final picked = await _imagePicker.pickImage(
-        source: source,
-        imageQuality: 80,
-      );
-      if (picked == null || !mounted) return;
-      setState(() => _pendingImage = File(picked.path));
+      if (!mounted) return;
+      final path = source == ImageSource.camera
+          ? await Navigator.of(context).push<String>(
+              MaterialPageRoute(builder: (_) => const TakePhotoScreen()),
+            )
+          : (await _imagePicker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 80,
+            ))?.path;
+      if (path == null || !mounted) return;
+      setState(() => _pendingImage = File(path));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -458,6 +563,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         body: Column(
           children: [
             Expanded(
+              key: _messageViewportKey,
               child: BlocConsumer<MessageBloc, MessageState>(
                 listener: (_, state) {
                   if (state is! MessageLoaded) return;
@@ -515,6 +621,12 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   final messages = state is MessageLoaded
                       ? state.messages
                       : const <MessageEntity>[];
+                  final seenMessageId = widget.isGroup
+                      ? null
+                      : latestSeenMessageId(
+                          messages, widget.participantId, _recipientReadId,
+                        );
+                  _scheduleReadCheck();
                   if (messages.isEmpty)
                     return const Center(
                       child: Text('Say hello to start the conversation.'),
@@ -554,6 +666,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                             : null,
                       );
                       return Column(
+                        key: _messageKeys.putIfAbsent(
+                          message.id, () => GlobalKey(),
+                        ),
                         children: [
                           if (startsDay)
                             Center(
@@ -570,6 +685,11 @@ class _ConversationScreenState extends State<ConversationScreen> {
                               ),
                             ),
                           bubble,
+                          if (message.id == seenMessageId)
+                            ReadReceiptAvatar(
+                              name: widget.participantName,
+                              avatarUrl: widget.avatarUrl,
+                            ),
                         ],
                       );
                     },

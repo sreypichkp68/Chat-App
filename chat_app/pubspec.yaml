@@ -27,6 +27,7 @@ dependencies:
   flutter_dotenv: ^6.0.1
   flutter_launcher_icons: ^0.14.4
   agora_rtc_engine: ^6.6.4
+  camera: ^0.12.0+2
 
 flutter_icons:
   android: true

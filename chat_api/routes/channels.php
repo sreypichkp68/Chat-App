@@ -1,5 +1,5 @@
 <?php
-
+//for realtime 
 use App\Models\Conversation;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Log;
