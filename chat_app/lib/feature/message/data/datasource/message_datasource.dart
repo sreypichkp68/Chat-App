@@ -34,6 +34,7 @@ class ConversationSummary {
   final DateTime? lastMessageAt;
   final String? lastMessageSenderId;
   final bool isMissedCall;
+  final bool isUnread;
 
   const ConversationSummary({
     required this.id,
@@ -46,6 +47,7 @@ class ConversationSummary {
     required this.lastMessageAt,
     required this.lastMessageSenderId,
     required this.isMissedCall,
+    this.isUnread = false,
   });
 
   factory ConversationSummary.fromJson(
@@ -74,6 +76,20 @@ class ConversationSummary {
     final createdAt = lastMessage['created_at'];
     final lastMessageType = lastMessage['message_type'] as String?;
     final lastMessageContent = lastMessage['content'] as String?;
+    final ownMember = (json['members'] as List? ?? const [])
+        .whereType<Map>()
+        .where((member) => member['user_id']?.toString() == currentUserId)
+        .firstOrNull;
+    final lastReadId = int.tryParse(
+      ownMember?['last_read_message_id']?.toString() ?? '',
+    ) ?? 0;
+    final lastMessageId = int.tryParse(lastMessage['id']?.toString() ?? '') ?? 0;
+    final isUnread = !isGroup &&
+        currentUserId != null &&
+        ownMember != null &&
+        lastMessage['sender_id'] != null &&
+        lastMessage['sender_id'].toString() != currentUserId &&
+        lastMessageId > lastReadId;
 
     String previewText;
     var isMissedCall = false;
@@ -159,6 +175,7 @@ class ConversationSummary {
       lastMessageAt: createdAt is String ? DateTime.tryParse(createdAt) : null,
       lastMessageSenderId: lastMessage['sender_id']?.toString(),
       isMissedCall: isMissedCall,
+      isUnread: isUnread,
     );
   }
 

@@ -177,6 +177,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           !listEquals(before.memberAvatars, after.memberAvatars) ||
           before.isGroup != after.isGroup ||
           before.isMissedCall != after.isMissedCall ||
+          before.isUnread != after.isUnread ||
           before.lastMessage != after.lastMessage ||
           before.lastMessageAt != after.lastMessageAt) {
         return false;
@@ -534,16 +535,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                       conversation.participantName,
                                       style: TextStyle(
                                         color: scheme.onSurface,
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: conversation.isUnread
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
                                       ),
                                     ),
                                     subtitle: Text(
                                       conversation.lastMessage,
-                                      style: conversation.isMissedCall
-                                          ? const TextStyle(
-                                              color: Color(0xFFE0433C),
-                                            )
-                                          : null,
+                                      style: TextStyle(
+                                        fontWeight: conversation.isUnread
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                        color: conversation.isMissedCall
+                                            ? const Color(0xFFE0433C)
+                                            : conversation.isUnread
+                                            ? scheme.onSurface
+                                            : scheme.onSurfaceVariant,
+                                      ),
                                     ),
                                     trailing: Text(
                                       _formatChatTime(

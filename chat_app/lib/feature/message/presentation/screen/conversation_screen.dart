@@ -656,6 +656,12 @@ class _ConversationScreenState extends State<ConversationScreen>
                             ? message.senderName ?? 'User ${message.senderId}'
                             : null,
                         time: _formatMessageTime(message.createdAt),
+                        readReceipt: message.id == seenMessageId
+                            ? ReadReceiptAvatar(
+                                name: widget.participantName,
+                                avatarUrl: widget.avatarUrl,
+                              )
+                            : null,
                         onTap: () => _showMessageActions(message),
                         onCallBack: message.isCallLog && !widget.isGroup
                             ? () {
@@ -685,11 +691,6 @@ class _ConversationScreenState extends State<ConversationScreen>
                               ),
                             ),
                           bubble,
-                          if (message.id == seenMessageId)
-                            ReadReceiptAvatar(
-                              name: widget.participantName,
-                              avatarUrl: widget.avatarUrl,
-                            ),
                         ],
                       );
                     },
@@ -816,6 +817,7 @@ class _MessageBubble extends StatelessWidget {
     required this.time,
     required this.onTap,
     this.onCallBack,
+    this.readReceipt,
   });
   final MessageEntity message;
   final bool sentByMe;
@@ -823,6 +825,7 @@ class _MessageBubble extends StatelessWidget {
   final String time;
   final VoidCallback onTap;
   final VoidCallback? onCallBack;
+  final Widget? readReceipt;
 
   @override
   Widget build(BuildContext context) {
@@ -937,9 +940,18 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              time,
-              style: const TextStyle(color: Color(0xFF9DA1A7), fontSize: 11),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  time,
+                  style: const TextStyle(color: Color(0xFF9DA1A7), fontSize: 11),
+                ),
+                if (readReceipt != null) ...[
+                  const SizedBox(width: 6),
+                  readReceipt!,
+                ],
+              ],
             ),
           ],
         ),

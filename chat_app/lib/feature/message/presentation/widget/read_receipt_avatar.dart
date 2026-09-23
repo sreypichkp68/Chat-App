@@ -30,26 +30,20 @@ class ReadReceiptAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final photo = profileAvatarImage(avatarUrl);
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Tooltip(
-          message: 'Seen by $name',
-          excludeFromSemantics: true,
-          child: Semantics(
-            label: 'Seen by $name',
-            excludeSemantics: true,
-            child: CircleAvatar(
-              radius: 9,
-              backgroundColor: const Color(0xFF34C471),
-              foregroundImage: photo,
-              onForegroundImageError: photo == null ? null : (_, error) {},
-              child: Text(
-                name.isEmpty ? '?' : name.characters.first.toUpperCase(),
-                style: const TextStyle(fontSize: 10, color: Colors.white),
-              ),
-            ),
+    return Tooltip(
+      message: 'Seen by $name',
+      excludeFromSemantics: true,
+      child: Semantics(
+        label: 'Seen by $name',
+        excludeSemantics: true,
+        child: CircleAvatar(
+          radius: 9,
+          backgroundColor: const Color(0xFF34C471),
+          foregroundImage: photo,
+          onForegroundImageError: photo == null ? null : (_, error) {},
+          child: Text(
+            name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+            style: const TextStyle(fontSize: 10, color: Colors.white),
           ),
         ),
       ),
